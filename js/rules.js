@@ -1,6 +1,6 @@
 // 萧山麻将 —— 胡牌判定 + 番型计分
 import {
-  KIND_COUNT, WILD_ID, isWild, kindIndex, toCounts, suitOf,
+  KIND_COUNT, isWild, toCounts, suitOf, idOfIndex,
 } from './tiles.js';
 
 /** 番型倍数表（依据公开的萧山麻将规则整理，可按牌桌习惯调整） */
@@ -156,7 +156,7 @@ export function winningTiles(handIds, meldCount = 0) {
   const setsNeed = 4 - meldCount;
   if (handIds.length !== setsNeed * 3 + 1) return out;
   for (let i = 0; i < KIND_COUNT; i++) {
-    const id = idOfIndexSafe(i);
+    const id = idOfIndex(i);
     const test = [...handIds, id];
     if (setsNeed === 4 && test.length === 14 && isSevenPairs(test)) {
       out.push(id);
@@ -165,16 +165,6 @@ export function winningTiles(handIds, meldCount = 0) {
     if (isWinningHand(test, meldCount)) out.push(id);
   }
   return out;
-}
-
-let KIND_CACHE = null;
-function idOfIndexSafe(i) {
-  if (!KIND_CACHE) {
-    KIND_CACHE = [];
-    for (const s of ['m', 's', 'p']) for (let n = 1; n <= 9; n++) KIND_CACHE.push(s + n);
-    for (let n = 1; n <= 7; n++) KIND_CACHE.push('z' + n);
-  }
-  return KIND_CACHE[i];
 }
 
 /**

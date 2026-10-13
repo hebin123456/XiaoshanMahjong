@@ -5,6 +5,7 @@ import { makeWall, toCounts, KIND_COUNT, seededRng } from '../js/tiles.js';
 import {
   isWinningHand, isSevenPairs, winningTiles, evaluateWin,
 } from '../js/rules.js';
+import { Game, PHASE, nextSeat } from '../js/engine.js';
 
 let passed = 0;
 function it(name, fn) {
@@ -98,6 +99,94 @@ it('庄家 ×2、连庄再翻倍', () => {
   const r1 = evaluateWin(hand, [], { selfDraw: true, dealer: true, dealerStreak: 0 });
   const r2 = evaluateWin(hand, [], { selfDraw: true, dealer: true, dealerStreak: 1 });
   assert.ok(r2.multiplier >= r1.multiplier);
+});
+
+console.log('引擎');
+
+function randPick(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+/** 用随机策略把一局打完，验证状态机健壮性 */
+function playRandom(allowRush, seed) {
+  const game = new Game({ allowRush, rng: seededRng(seed) });
+  let guard = 0;
+  while (!game.over) {
+    if (guard++ > 6000) throw new Error('对局未能在合理步数内结束');
+    if (game.phase === PHASE.DRAW) {
+      game.drawFor(game.turn);
+      if (game.over) break;
+    }
+    if (game.phase === PHASE.DISCARD) {
+      const seat = game.turn;
+      const info = game.checkSelfWin(seat);
+      if (info.win) { game.finish(seat, info, { type: 'self' }); break; }
+      const gangs = game.selfGangOptions(seat);
+      if (gangs.length && Math.random() < 0.5) {
+        const g = randPick(gangs);
+        game.doSelfGang(seat, g.tile, g.type);
+        continue;
+      }
+      const p = game.player(seat);
+      let r = game.discard(seat, randPick(p.hand));
+      let tries = 0;
+      while (r.error && tries++ < 30) r = game.discard(seat, randPick(p.hand));
+      if (r.error) throw new Error('无法出牌: ' + r.error);
+      continue;
+    }
+    if (game.phase === PHASE.CLAIM) {
+      for (const cand of game.pending.candidates) {
+        let decision = null;
+        if (Math.random() < 0.6) {
+          const a = randPick(cand.actions);
+          decision = a === 'chi'
+            ? { action: 'chi', tiles: randPick(cand.chiOptions) }
+            : { action: a };
+        }
+        game.submitClaim(cand.seat, decision);
+      }
+      game.resolveClaims();
+      continue;
+    }
+    throw new Error('未知阶段: ' + game.phase);
+  }
+  return game;
+}
+
+it('发牌：庄家 14 张，其余各 13 张', () => {
+  const g = new Game({ rng: seededRng(7) });
+  assert.equal(g.player(g.dealer).hand.length, 14);
+  for (let s = 0; s < 4; s++) {
+    if (s === g.dealer) continue;
+    assert.equal(g.player(s).hand.length, 13);
+  }
+  assert.equal(g.player(nextSeat(g.dealer)).hand.length, 13);
+  assert.ok(g.indicator);
+});
+
+it('随机策略可完整打完整局（自摸专属 20 局）', () => {
+  for (let i = 0; i < 20; i++) {
+    const g = playRandom(false, 1000 + i);
+    assert.equal(g.over, true);
+    assert.ok(g.result);
+  }
+});
+
+it('随机策略可完整打完整局（允许捉冲 20 局）', () => {
+  for (let i = 0; i < 20; i++) {
+    const g = playRandom(true, 2000 + i);
+    assert.equal(g.over, true);
+    assert.ok(g.result);
+  }
+});
+
+it('牌张守恒：手牌 + 亮牌 + 弃牌 + 牌墙 = 136', () => {
+  const g = playRandom(true, 4321);
+  const total = g.players.reduce(
+    (n, p) => n + p.hand.length + p.melds.reduce((m, x) => m + x.tiles.length, 0) + p.discards.length,
+    0,
+  );
+  assert.equal(total + g.wall.length + 1, 136); // +1 为财神翻牌
 });
 
 console.log(`\n${passed} 项通过`);
