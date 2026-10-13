@@ -1,0 +1,11 @@
+{
+  "name": "xiaoshan-mahjong",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "萧山麻将单机版：玩家 vs 3 个 AI，横屏 / 折叠屏适配",
+  "scripts": {
+    "test": "node tools/selftest.mjs",
+    "start": "npx --yes serve ."
+  }
+}
