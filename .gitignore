@@ -1,0 +1,14 @@
+# 编辑器 / 系统
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+
+# 依赖（本项目无需构建，保留以防后续引入工具）
+node_modules/
+package-lock.json
+
+# 打包产物
+dist/
+*.zip
