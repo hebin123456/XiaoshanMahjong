@@ -6,6 +6,7 @@ import {
   isWinningHand, isSevenPairs, winningTiles, evaluateWin,
 } from '../js/rules.js';
 import { Game, PHASE, nextSeat } from '../js/engine.js';
+import { chooseDiscard, chooseClaim, chooseSelfGang, structureScore } from '../js/ai.js';
 
 let passed = 0;
 function it(name, fn) {
@@ -187,6 +188,70 @@ it('牌张守恒：手牌 + 亮牌 + 弃牌 + 牌墙 = 136', () => {
     0,
   );
   assert.equal(total + g.wall.length + 1, 136); // +1 为财神翻牌
+});
+
+console.log('AI');
+
+/** 全部由 AI 决策把一局打完 */
+function playAI(allowRush, seed) {
+  const game = new Game({ allowRush, rng: seededRng(seed), isAI: [true, true, true, true] });
+  let guard = 0;
+  while (!game.over) {
+    if (guard++ > 6000) throw new Error('AI 对局未能在合理步数内结束');
+    if (game.phase === PHASE.DRAW) {
+      game.drawFor(game.turn);
+      if (game.over) break;
+    }
+    if (game.phase === PHASE.DISCARD) {
+      const seat = game.turn;
+      const info = game.checkSelfWin(seat);
+      if (info.win) { game.finish(seat, info, { type: 'self' }); break; }
+      const gangs = game.selfGangOptions(seat);
+      const g = chooseSelfGang(game, seat, gangs);
+      if (g) { game.doSelfGang(seat, g.tile, g.type); continue; }
+      const r = game.discard(seat, chooseDiscard(game, seat));
+      if (r.error) throw new Error('AI 出牌被拒: ' + r.error);
+      continue;
+    }
+    if (game.phase === PHASE.CLAIM) {
+      for (const cand of game.pending.candidates) {
+        game.submitClaim(cand.seat, chooseClaim(game, cand.seat, cand));
+      }
+      game.resolveClaims();
+      continue;
+    }
+    throw new Error('未知阶段: ' + game.phase);
+  }
+  return game;
+}
+
+it('AI 不会主动打出财神（白板）', () => {
+  const g = new Game({ rng: seededRng(3) });
+  g.player(0).hand = ['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 's1', 's2', 's3', 'p7', 'p8', 'z7', 'z1', 'z4'];
+  g.turn = 0;
+  g.phase = PHASE.DISCARD;
+  const t = chooseDiscard(g, 0);
+  assert.notEqual(t, 'z7');
+  assert.ok(g.player(0).hand.includes(t));
+});
+
+it('AI 见到可胡的弃牌会选择胡', () => {
+  const g = new Game({ rng: seededRng(5), allowRush: true });
+  g.player(1).hand = ['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 's1', 's2', 's3', 'p7', 'p8', 'z1', 'z1'];
+  g.lastDiscard = { tile: 'p9', from: 0 };
+  const d = chooseClaim(g, 1, { seat: 1, actions: ['win', 'peng'], chiOptions: [] });
+  assert.equal(d.action, 'win');
+});
+
+it('结构评分：完整面子得分高于孤张', () => {
+  const good = structureScore(['m1', 'm2', 'm3', 'm4', 'm5', 'm6']);
+  const bad = structureScore(['m1', 'm5', 'z1', 'z4', 'p3', 's9']);
+  assert.ok(good > bad);
+});
+
+it('AI 全自动对局可完整打完（各 15 局）', () => {
+  for (let i = 0; i < 15; i++) assert.equal(playAI(false, 3000 + i).over, true);
+  for (let i = 0; i < 15; i++) assert.equal(playAI(true, 4000 + i).over, true);
 });
 
 console.log(`\n${passed} 项通过`);
