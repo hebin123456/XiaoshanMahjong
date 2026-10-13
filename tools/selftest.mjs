@@ -1,12 +1,12 @@
 // Node 自测：牌面 / 胡牌判定 / 番型计分
 // 运行：node tools/selftest.mjs
 import assert from 'node:assert/strict';
-import { makeWall, toCounts, KIND_COUNT, seededRng } from '../js/tiles.js';
+import { makeWall, toCounts, KIND_COUNT, seededRng } from '../www/js/tiles.js';
 import {
   isWinningHand, isSevenPairs, winningTiles, evaluateWin,
-} from '../js/rules.js';
-import { Game, PHASE, nextSeat } from '../js/engine.js';
-import { chooseDiscard, chooseClaim, chooseSelfGang, structureScore } from '../js/ai.js';
+} from '../www/js/rules.js';
+import { Game, PHASE, nextSeat } from '../www/js/engine.js';
+import { chooseDiscard, chooseClaim, chooseSelfGang, structureScore } from '../www/js/ai.js';
 
 let passed = 0;
 function it(name, fn) {
