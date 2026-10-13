@@ -1,11 +1,11 @@
 # 萧山麻将 · XiaoshanMahjong
 
-**安卓 App**（也支持浏览器直接玩）的萧山麻将单机版：**你 vs 3 个电脑 AI**。
+**安卓原生 App**（Kotlin + Jetpack Compose）单机版萧山麻将：**你 vs 3 个电脑 AI**。
 横屏设计，适配折叠屏 / 双屏设备；摸牌、出牌带手部动画。
 
 - 玩法：萧山麻将（杭州麻将加强版），136 张，财神百搭，番型计分
 - 规则：开局可选「自摸专属」或「允许捉冲」
-- 交付：Web 静态站点 → Capacitor 打包为 Android APK，由 GitHub Actions 自动构建发布
+- 交付：纯原生 Android 工程，由 GitHub Actions 自动构建 APK 并发布 Release
 
 ## 玩法要点
 
@@ -18,6 +18,18 @@
 - **吃 / 碰 / 杠**：吃只吃上家；碰、杠任意家（明杠 / 暗杠 / 补杠）；杠后补牌自摸即「杠开」。
 - **财神打出**：白板打出时其他三家不能吃 / 碰。
 - **吃张打张**：已吃上家 2 摊后，不允许「吃张打张」。
+
+## 主界面设置
+
+开始对局前可在主界面调整以下规则（会记住上次选择）：
+
+- **AI 强度**：入门 / 普通 / 高手。高手会看得更远，倾向保留听口、少打危险牌。
+- **允许捉冲（点炮胡）**：关闭即「自摸专属」，只能自摸；开启后别人打出的牌也能胡。
+- **有财神必须爆头**：开启时手里有财神，至少留 1 张做将牌（爆头），多余的财神可自由组合。
+- **允许吃三摊（承包）**：关闭时每家最多吃/碰/杠 2 摊；开启时第 3 摊触发承包绑定 ——
+  - 绑定的两人里谁胡，由另一个人独付全部并加倍；
+  - 若其他家胡，供牌方该付的钱由吃太多的人代付。
+
 
 ## 番型与倍数
 
@@ -43,33 +55,32 @@
 
 ```
 .
-├── www/                     Web 端源码（也是 Android 的 web 资源目录）
-│   ├── index.html           入口页面
-│   ├── css/style.css        横屏 / 折叠屏样式
-│   ├── js/tiles.js          牌面定义与工具
-│   ├── js/rules.js          胡牌判定 + 番型计分
-│   ├── js/engine.js         牌墙 / 发牌 / 回合状态机
-│   ├── js/ai.js             电脑 AI 策略
-│   ├── js/ui.js             界面渲染 + 手部动画
-│   ├── js/main.js           入口逻辑
-│   └── assets/tiles/        开源麻将牌贴图（CC0，含 LICENSE.md）
-├── android/                 Capacitor 生成的安卓工程
-├── tools/selftest.mjs       Node 自测脚本（引擎 / 胡牌 / AI）
-└── .github/workflows/       自动打包 APK 并发布 Release
+├── app/                       Android 应用模块（Compose 界面）
+│   └── src/main/
+│       ├── java/com/hebin/xiaoshanmahjong/
+│       │   ├── MainActivity.kt        入口 Activity
+│       │   ├── game/                  纯 Kotlin 游戏逻辑（见 core）
+│       │   └── ui/                    Compose 牌桌与手部动画
+│       └── res/drawable-nodpi/        麻将牌贴图（300×400 PNG）
+├── core/                      纯 Kotlin 逻辑模块（牌面 / 规则 / 引擎 / AI，可单测）
+│   └── src/test/              单元测试（胡牌判定 / 番型 / 对局自测）
+├── art/tiles-svg/             开源麻将牌 SVG 源文件（CC0，含 LICENSE.md）
+└── .github/workflows/         自动构建 APK 并发布 Release
 ```
 
-## 本地运行（仅 Web 调试，不需编译安卓）
+## 构建与测试
 
 ```bash
-npm test                  # 跑引擎自测
-npx serve www             # 浏览器调试
+# 只跑纯逻辑单元测试（不需要 Android SDK）
+gradle :core:test
+
+# 构建 debug APK（需要 Android SDK）
+gradle :app:assembleDebug
 ```
 
-## 安卓打包
+也支持在 GitHub Actions 自动完成（本地无需安装 Android SDK）：
 
-由 GitHub Actions 自动完成（本地无需安装 Android SDK）：
-
-- 推送到 `master` → 构建 debug APK → 附加到 Release
+- 推送到 `master` → 跑单测（`gradle test`）→ 构建 debug APK → 附加到 Release
 - 也可在 Actions 页面手动触发 `workflow_dispatch`
 
 产物：`xiaoshan-mahjong.apk`，用安卓手机直接安装即可。
@@ -77,12 +88,13 @@ npx serve www             # 浏览器调试
 ## 素材来源
 
 - 麻将牌贴图：[FluffyStuff/riichi-mahjong-tiles](https://github.com/FluffyStuff/riichi-mahjong-tiles)，**CC0 1.0 公有领域**。
-  文件位于 `www/assets/tiles/`，牌名映射：`m*=Man`、`s*=Sou`（索子）、`p*=Pin`（筒子）、`z1..z7 = Ton/Nan/Shaa/Pei/Chun/Hatsu/Haku`（东南西北中发白）。
-- 手部动画为本项目自绘 SVG，无版权限制。
+  SVG 源文件位于 `art/tiles-svg/`，栅格化后的 PNG 位于 `app/src/main/res/drawable-nodpi/`，
+  牌名映射：`m*=Man`（万）、`s*=Sou`（索）、`p*=Pin`（筒）、`z1..z7 = 东南西北中发白`。
+- 手部动画为本项目自绘，无版权限制。
 
 ## 规则实现的说明
 
-以下细节在不同牌局 / 平台上有差异，本项目采用当前解释，集中在 `www/js/rules.js`，便于按你的牌桌习惯调整：
+以下细节在不同牌局 / 平台上有差异，本项目采用当前解释，集中在 `core/src/main/kotlin/.../Rules.kt`，便于按你的牌桌习惯调整：
 
 - 财神以**白板**为万能百搭；翻出的那张牌仅作「本局财神」展示。
 - 「爆头 / 全倒 / 财飘」等方言番型的判定为**推断实现**（依据公开资料），定义见上表。

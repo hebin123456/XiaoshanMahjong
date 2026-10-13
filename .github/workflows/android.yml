@@ -36,7 +36,7 @@ jobs:
           gradle-version: '8.11.1'
 
       - name: Unit tests
-        run: gradle testDebugUnitTest --stacktrace
+        run: gradle test --stacktrace
 
       - name: Build debug APK
         run: gradle assembleDebug --stacktrace
