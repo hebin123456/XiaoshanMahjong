@@ -15,4 +15,5 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "XiaoshanMahjong"
+include(":core")
 include(":app")
