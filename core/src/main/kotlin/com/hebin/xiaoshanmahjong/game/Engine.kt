@@ -64,6 +64,9 @@ class Game(
     /** 财神翻牌（仅展示用）。 */
     var indicator: Int = -1
 
+    /** 最近一次摸到的牌（仅展示用，界面据此把新摸的牌单独摆放）。 */
+    var lastDrawnTile: Int = -1
+
     var pending: Pending? = null
     var lastDiscardTile: Int = -1
     var lastDiscardFrom: Int = -1
@@ -86,7 +89,9 @@ class Game(
         val w = makeWall(rng)
         for (t in w) wall.add(t)
         repeat(13) { for (s in 0 until 4) player(s).hand.add(drawTile()) }
-        player(dealer).hand.add(drawTile())
+        val dealerExtra = drawTile()
+        player(dealer).hand.add(dealerExtra)
+        lastDrawnTile = dealerExtra
         indicator = drawTile()
         for (p in players) p.hand.sort()
         turn = dealer
@@ -108,6 +113,7 @@ class Game(
         p.hand.add(t)
         p.hand.sort()
         p.drawCount++
+        lastDrawnTile = t
         turn = seat
         phase = Phase.DISCARD
     }
