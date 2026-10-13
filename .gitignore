@@ -5,10 +5,23 @@ Thumbs.db
 .vscode/
 *.log
 
-# 依赖（本项目无需构建，保留以防后续引入工具）
-node_modules/
-package-lock.json
+# Android / Gradle
+.gradle/
+build/
+*/build/
+local.properties
+*.iml
+captures/
+.externalNativeBuild/
+.cxx/
+
+# 签名文件（不要提交）
+*.jks
+*.keystore
+keystore.properties
 
 # 打包产物
 dist/
 *.zip
+*.apk
+*.aab
