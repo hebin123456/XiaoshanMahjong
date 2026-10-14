@@ -278,8 +278,10 @@ bool GameEngine::estimateUserRespond(uint8_t cbCurrentUser, uint8_t cbCurrentCar
         if (cbCurrentUser == i) continue;                       //过滤当前出牌的玩家，即自己不能胡自己的牌
         if (estimateKind == EstimateKind_OutCard)               //出牌方式为普通出牌
         {
+            //萧山麻将：未开启吃三摊时，每家最多 2 摊（明牌组合），不能碰/杠第 3 摊
+            bool bSanTanLimit = (!GameLogic::s_RuleFlags.allowChiSanTan && m_cbWeaveItemCount[i] >= 2);
             //萧山麻将：白板为万能财神，打出后其余三家不能吃/碰/杠（但可以胡）
-            if (cbCurrentCard != JOKER_CARD) {
+            if (cbCurrentCard != JOKER_CARD && !bSanTanLimit) {
                 if (!m_cbPassPeng[i][GameLogic::switchToCardIndex(cbCurrentCard)])            //检测可以碰牌、没碰上家的牌不能碰对家和下家的
                 {
                     m_cbUserAction[i] |= GameLogic::estimatePengCard(m_cbCardIndex[i], cbCurrentCard);    //碰牌判断
@@ -754,6 +756,10 @@ bool GameEngine::onEventGameConclude(uint8_t cbChairID) {
                 if ((m_llHuRight[i] != 0x0) && (i != m_cbProvideUser) && FvMask::HasAny(m_cbTargetUser, _MASK_(i))) {
                     //翻数计算
                     uint8_t cbChiHuOrder = GameLogic::getHuFanShu(m_llHuRight[i], m_cbHuKind[i], m_cbHuSpecial[i]);
+                    //萧山承包：胡牌者已亮三摊时，放炮者独付并加倍
+                    if (GameLogic::s_RuleFlags.allowChiSanTan && m_cbWeaveItemCount[i] >= 3) {
+                        cbChiHuOrder = (cbChiHuOrder * 2 > 64) ? 64 : static_cast<uint8_t>(cbChiHuOrder * 2);
+                    }
                     if (((m_cbHuSpecial[i] & CHS_DH) != 0)) {    //如果是地胡
                         for (uint8_t j = 0; j < m_CurrChair; j++) {
                             if (i != j) {
