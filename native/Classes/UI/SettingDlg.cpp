@@ -4,6 +4,7 @@
 
 #include "SettingDlg.h"
 #include "GameConfig.h"
+#include "Utility.h"
 
 using namespace std;
 
