@@ -27,6 +27,7 @@
 ### 进行中 🚧
 
 - [x] 补齐 `arm64-v8a` 外部预编译库（png/jpeg/zlib/freetype），放开 64 位打包。
+- [x] **适配 Android 16KB 页大小**：`APP_LDFLAGS` 增加 `-Wl,-z,max-page-size=16384`，满足 Android 15+ 对 16KB 内存页机型的要求。
 - [x] CI 出包验证（双架构 APK 可安装于 64 位机型）。
 - [ ] 萧山规则适配（C++ 逻辑层，见下）。
   - [x] **财神万能**：白板（z7 / 0x37）可替代任意牌组成顺/刻/将（`GameLogic::analyseCardJoker`），含财神七对亦可判定。
