@@ -3,7 +3,7 @@ APP_STL := c++_static
 APP_CPPFLAGS := -frtti -DCC_ENABLE_CHIPMUNK_INTEGRATION=1 -std=c++11 -fsigned-char -Wno-extern-c-compat -DUSE_SIMPLE_AUDIO_ENGINE
 APP_LDFLAGS := -latomic
 
-APP_ABI := armeabi-v7a
+APP_ABI := armeabi-v7a arm64-v8a
 APP_SHORT_COMMANDS := true
 
 

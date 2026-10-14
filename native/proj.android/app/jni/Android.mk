@@ -7,7 +7,9 @@ $(call import-add-path,$(LOCAL_PATH)/../../../cocos2d/external)
 $(call import-add-path,$(LOCAL_PATH)/../../../cocos2d/cocos)
 $(call import-add-path,$(LOCAL_PATH)/../../../cocos2d/cocos/audio/include)
 
-LOCAL_MODULE := MyGame_shared
+# 注意：AGP 8 会用 AndroidManifest 里的 android.app.lib_name(=MyGame)
+# 作为 ndk-build 的构建目标，因此模块名必须与之一致（.so 仍为 libMyGame.so）
+LOCAL_MODULE := MyGame
 
 LOCAL_MODULE_FILENAME := libMyGame
 
