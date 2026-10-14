@@ -9,16 +9,23 @@ Thumbs.db
 .gradle/
 build/
 */build/
+**/build/
 local.properties
 *.iml
 captures/
 .externalNativeBuild/
 .cxx/
+obj/
+libs/armeabi*/
+libs/arm64*/
+libs/x86*/
 
 # 签名文件（不要提交）
 *.jks
 *.keystore
 keystore.properties
+# 例外：保留工程自带的示例签名库，便于 CI 复现同一签名
+!native/proj.android/app/mj.keystore
 
 # 打包产物
 dist/

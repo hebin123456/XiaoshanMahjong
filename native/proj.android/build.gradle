@@ -1,0 +1,24 @@
+// 顶层构建脚本：现代 AGP + Gradle 8，仓库使用 google()/mavenCentral()（jcenter 已关停）
+
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.7.3'
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+tasks.register('clean', Delete) {
+    delete rootProject.buildDir
+}
+
+defaultTasks 'assembleDebug'

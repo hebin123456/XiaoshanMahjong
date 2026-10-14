@@ -1,102 +1,91 @@
 # 萧山麻将 · XiaoshanMahjong
 
-**安卓原生 App**（Kotlin + Jetpack Compose）单机版萧山麻将：**你 vs 3 个电脑 AI**。
-横屏设计，适配折叠屏 / 双屏设备；摸牌、出牌带手部动画。
+**安卓原生 App**：单机版萧山麻将，**你 vs 3 个电脑 AI**，横屏对局。
 
-- 玩法：萧山麻将（杭州麻将加强版），136 张，财神百搭，番型计分
-- 规则：开局可选「自摸专属」或「允许捉冲」
-- 交付：纯原生 Android 工程，由 GitHub Actions 自动构建 APK 并发布 Release
+技术路线：基于开源麻将工程 **cocostudio-mahjong**（C++ / Cocos2d-x 3.17）改造，
+在其成熟的麻将桌 UI、牌型算法与电脑 AI 之上，把规则层改造成**萧山麻将**。
+> 说明：本项目已**放弃早期的 Kotlin / Jetpack Compose 实现**，仓库从零重来，现以
+> Cocos2d-x 原生工程为唯一主线。
 
-## 玩法要点
+---
 
-- **牌张**：136 张（去掉 8 张花），每家码 17 墩。
-- **财神（百搭）**：四家抓完牌后翻出 1 张牌作为「财神翻牌」，**白板（z7）为万能百搭牌**，可替代任意牌组成顺子 / 刻子 / 将牌。
-- **胡牌**：开局可选
-  - `自摸专属`：必须自摸，不能捉冲（点炮）、不能抢杠胡（边锋规则）
-  - `允许捉冲`：别人打出的牌也可以胡
-- **抢庄制**：谁胡谁做庄，流局则连庄。
-- **吃 / 碰 / 杠**：吃只吃上家；碰、杠任意家（明杠 / 暗杠 / 补杠）；杠后补牌自摸即「杠开」。
-- **财神打出**：白板打出时其他三家不能吃 / 碰。
-- **吃张打张**：已吃上家 2 摊后，不允许「吃张打张」。
+## 进度（Progress）
 
-## 主界面设置
+### 已完成 ✅
 
-开始对局前可在主界面调整以下规则（会记住上次选择）：
+- [x] **并入上游源码**：`native/` 下完整收录 cocostudio-mahjong（Classes / Resources / cocos2d / cocosstudio / proj.android）。
+- [x] **补全构建依赖**：上游缺失 `external/android/cpufeatures`，已从 NDK 21.4.7075529 拷入 `native/cocos2d/external/android/cpufeatures`。
+- [x] **本地环境就绪**：JDK 17、Android SDK（platform 35 / build-tools 35）、NDK 21.4.7075529。
+- [x] **构建配置现代化**（`native/proj.android/`）：
+  - Gradle wrapper → **8.11.1**；AGP → **8.7.3**；
+  - 仓库由 `jcenter()` 改为 `google()` + `mavenCentral()`；
+  - `compileSdk / targetSdk = 35`，`minSdk = 21`；
+  - ABI 暂保持 `armeabi-v7a`（上游 cocos2d 外部库仅有 arm32 预编译，arm64 待补齐）；
+  - 移除 `buildToolsVersion` / `dexOptions` / 旧 `lintOptions`，改用 `namespace` 与 `lint {}`；
+  - AndroidManifest 去掉 `package`，补 `android:exported`（适配 Android 12+）。
 
-- **AI 强度**：入门 / 普通 / 高手。高手会看得更远，倾向保留听口、少打危险牌。
-- **允许捉冲（点炮胡）**：关闭即「自摸专属」，只能自摸；开启后别人打出的牌也能胡。
-- **有财神必须爆头**：开启时手里有财神，至少留 1 张做将牌（爆头），多余的财神可自由组合。
-- **允许吃三摊（承包）**：关闭时每家最多吃/碰/杠 2 摊；开启时第 3 摊触发承包绑定 ——
-  - 绑定的两人里谁胡，由另一个人独付全部并加倍；
-  - 若其他家胡，供牌方该付的钱由吃太多的人代付。
+### 进行中 🚧
 
+- [ ] 本地跑通 `gradle assembleDebug`（NDK 编译 C++ → 出 APK）。
+- [ ] 补齐 `arm64-v8a` 外部预编译库（png/jpeg/zlib/freetype），放开 64 位打包。
+- [ ] 萧山规则适配（C++ 逻辑层，见下）。
+- [ ] CI 出包验证。
 
-## 番型与倍数
+---
 
-| 番型 | 倍数 | 说明 |
+## 萧山麻将规则要点（待适配到 C++ 逻辑层）
+
+| 规则 | 说明 | 目标位置 |
 | --- | --- | --- |
-| 自摸 | ×1 | 基础 |
-| 爆头 | ×2 | 胡牌时将牌中含财神 |
-| 碰碰胡 | ×2 | 全部面子为刻子 / 杠 |
-| 全倒 | ×2 | 面子全部由吃碰杠明牌组成（手中仅剩将牌） |
-| 明杠开 | ×2 | 明杠后补牌自摸 |
-| 暗杠开 | ×4 | 暗杠后补牌自摸 |
-| 财飘 | ×4 | 本局曾打出过财神后仍自摸胡 |
-| 七对子（含财神） | ×4 | 七对且用到财神 |
-| 清七对（无财神） | ×8 | 七对且全部为天然牌 |
-| 清一色 | ×8 | 全部同一花色 |
-| 字一色 | ×16 | 全部为字牌 |
-| 天胡 | ×16 | 庄家起手 14 张即胡 |
-| 地胡 | ×16 | 闲家第一次摸牌即胡 |
+| 财神（万能百搭） | **白板（z7）为万能财神**，可替代任意牌组成顺/刻/将；开局翻出的牌仅作「本局财神」展示 | `GameLogic` 胡牌/听牌分析 |
+| 财神打出限制 | 白板打出时，其余三家不能吃 / 碰 | `GameEngine` 动作裁决 |
+| 有财神必须爆头 | 开关项：开启时手中财神至少留 1 张做将牌（爆头 ×2） | 规则开关 + 番型 |
+| 允许捉冲（点炮胡） | 开关项：关闭即「自摸专属」，只能自摸 | `GameLogic::analyseHuCard` |
+| 允许吃三摊（承包） | 开关项：关闭时每家最多吃/碰/杠 2 摊；开启时第 3 摊触发**承包**绑定，绑定方独付并加倍 | `GameEngine` 结算 |
+| 抢庄制 | 谁胡谁做庄，流局连庄 | `GameEngine` 局末 |
+| 吃张打张 | 已吃上家 2 摊后不允许吃张打张 | `GameEngine` 出牌校验 |
 
-倍数可叠加（如 杠开 + 爆头 = 2×2 = 4）。庄家 ×2，二连庄 ×4，三连庄及以上 ×8。单局封顶 64 倍基数。
+### 番型与倍数（目标）
 
-## 目录结构
+自摸 ×1（基础）｜爆头 ×2｜碰碰胡 ×2｜全倒 ×2｜明杠开 ×2｜暗杠开 ×4｜
+财飘 ×4｜七对 ×4｜清七对 ×8｜清一色 ×8｜字一色 ×16｜天胡 ×16｜地胡 ×16。
+倍数可叠加，庄家 ×2，封顶 64 倍。
+
+### 主界面设置项（目标）
+
+AI 强度（入门/普通/高手）、允许捉冲（点炮胡）、有财神必须爆头、允许吃三摊（承包）。
+
+---
+
+## 仓库结构
 
 ```
 .
-├── app/                       Android 应用模块（Compose 界面）
-│   └── src/main/
-│       ├── java/com/hebin/xiaoshanmahjong/
-│       │   ├── MainActivity.kt        入口 Activity
-│       │   ├── game/                  纯 Kotlin 游戏逻辑（见 core）
-│       │   └── ui/                    Compose 牌桌与手部动画
-│       └── res/drawable-nodpi/        麻将牌贴图（300×400 PNG）
-├── core/                      纯 Kotlin 逻辑模块（牌面 / 规则 / 引擎 / AI，可单测）
-│   └── src/test/              单元测试（胡牌判定 / 番型 / 对局自测）
-├── art/tiles-svg/             开源麻将牌 SVG 源文件（CC0，含 LICENSE.md）
-└── .github/workflows/         自动构建 APK 并发布 Release
+├── native/                        C++ / Cocos2d-x 工程（本项目主体）
+│   ├── Classes/                   游戏逻辑 + UI
+│   │   ├── GameLogic/             胡牌判定 / 番型 / 听牌（规则改造重点）
+│   │   ├── GameLogic/Player/      真人 & AI 玩家
+│   │   ├── Scene/ UI/ App/        场景、界面、入口
+│   │   └── Common/                配置、命令、工具
+│   ├── Resources/                 牌桌素材（含 UI.ccs 等）
+│   ├── cocos2d/                   Cocos2d-x 3.17 引擎源码
+│   ├── cocosstudio/               CocoStudio 运行时
+│   └── proj.android/              Android 打包工程（Gradle + ndk-build）
+└── .github/workflows/android.yml  CI：自动构建 APK 并发布 Release
 ```
 
-## 构建与测试
+## 构建
 
 ```bash
-# 只跑纯逻辑单元测试（不需要 Android SDK）
-gradle :core:test
-
-# 构建 debug APK（需要 Android SDK）
-gradle :app:assembleDebug
+# 需要：JDK 17、Android SDK(35)、NDK 21.4.7075529，并设置 ANDROID_SDK_ROOT
+cd native/proj.android
+gradle assembleDebug        # 产物：app/build/outputs/apk/debug/app-debug.apk
 ```
 
-也支持在 GitHub Actions 自动完成（本地无需安装 Android SDK）：
+也可由 GitHub Actions 自动完成：推送到 `master` → 构建 debug APK → 附加到 Release
+（产物名 `xiaoshan-mahjong.apk`）。
 
-- 推送到 `master` → 跑单测（`gradle test`）→ 构建 debug APK → 附加到 Release
-- 也可在 Actions 页面手动触发 `workflow_dispatch`
+## 素材与授权
 
-产物：`xiaoshan-mahjong.apk`，用安卓手机直接安装即可。
-
-## 素材来源
-
-- 麻将牌贴图：[FluffyStuff/riichi-mahjong-tiles](https://github.com/FluffyStuff/riichi-mahjong-tiles)，**CC0 1.0 公有领域**。
-  SVG 源文件位于 `art/tiles-svg/`，栅格化后的 PNG 位于 `app/src/main/res/drawable-nodpi/`，
-  牌名映射：`m*=Man`（万）、`s*=Sou`（索）、`p*=Pin`（筒）、`z1..z7 = 东南西北中发白`。
-- 手部动画为本项目自绘，无版权限制。
-
-## 规则实现的说明
-
-以下细节在不同牌局 / 平台上有差异，本项目采用当前解释，集中在 `core/src/main/kotlin/.../Rules.kt`，便于按你的牌桌习惯调整：
-
-- 财神以**白板**为万能百搭；翻出的那张牌仅作「本局财神」展示。
-- 「爆头 / 全倒 / 财飘」等方言番型的判定为**推断实现**（依据公开资料），定义见上表。
-- 「同一张牌不碰上家就不可以碰下家」这类极冷门的地方细则未实现。
-- 结算：自摸三家各付；捉冲由点炮者独付；吃碰杠达 3 摊触发承包者独付并加倍。
+- 上游工程 **cocostudio-mahjong** 已获得作者授权后并入本项目。
+- 麻将牌贴图与 UI 素材来自上游工程自带资源。

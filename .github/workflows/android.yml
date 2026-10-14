@@ -1,4 +1,4 @@
-name: Android
+name: Android (Cocos2d-x native)
 
 on:
   push:
@@ -12,7 +12,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@v4
@@ -23,36 +23,28 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
+      - name: Set up Android SDK + NDK
         run: |
           SDK_ROOT="${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}"
           echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
           echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
-          echo "--- 预装 platforms ---"; ls "$SDK_ROOT/platforms" 2>/dev/null || true
-          echo "--- 预装 build-tools ---"; ls "$SDK_ROOT/build-tools" 2>/dev/null || true
-          if [ -d "$SDK_ROOT/platforms/android-35" ] && [ -d "$SDK_ROOT/build-tools/35.0.0" ]; then
-            echo "已预装 android-35 与 build-tools 35.0.0，跳过安装"
-          else
-            SDKMGR="$(find "$SDK_ROOT/cmdline-tools" -maxdepth 4 -type f -name sdkmanager 2>/dev/null | sort | tail -n1)"
-            echo "Using sdkmanager: $SDKMGR"
-            test -n "$SDKMGR" || { echo "未找到 sdkmanager"; exit 1; }
-            yes | "$SDKMGR" --licenses > /dev/null 2>&1 || true
-            "$SDKMGR" "platforms;android-35" "build-tools;35.0.0" "platform-tools"
-          fi
+          echo "ANDROID_NDK_HOME=$SDK_ROOT/ndk/21.4.7075529" >> "$GITHUB_ENV"
+          SDKMGR="$(find "$SDK_ROOT/cmdline-tools" -maxdepth 4 -type f -name sdkmanager 2>/dev/null | sort | tail -n1)"
+          test -n "$SDKMGR" || { echo "未找到 sdkmanager"; exit 1; }
+          echo "Using sdkmanager: $SDKMGR"
+          yes | "$SDKMGR" --licenses > /dev/null 2>&1 || true
+          "$SDKMGR" "platforms;android-35" "build-tools;35.0.0" "platform-tools" "ndk;21.4.7075529"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
 
-      - name: Unit tests
-        run: gradle test --stacktrace
-
       - name: Build debug APK
-        run: gradle assembleDebug --stacktrace
+        run: gradle -p native/proj.android assembleDebug --stacktrace
 
       - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk xiaoshan-mahjong.apk
+        run: cp native/proj.android/app/build/outputs/apk/debug/app-debug.apk xiaoshan-mahjong.apk
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -68,7 +60,7 @@ jobs:
           tag_name: dev-latest
           name: 开发版（最新构建）
           body: |
-            自动构建的萧山麻将安卓包。
+            自动构建的萧山麻将安卓包（基于 cocostudio-mahjong 改造）。
 
             - commit：${{ github.sha }}
             - 运行号：${{ github.run_number }}
