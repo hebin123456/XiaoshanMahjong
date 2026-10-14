@@ -897,7 +897,8 @@ uint64_t GameLogic::pingHu(const uint8_t *cbCardIndexTemp, const uint8_t cbCardC
  */
 uint64_t GameLogic::qingSe(const uint8_t *cbCardIndexTemp, const uint8_t cbCardCountTemp, const uint8_t *cbCardIndex, const uint8_t cbCardCount, tagWeaveItem *WeaveItem, uint8_t cbWeaveCount, CAnalyseItemArray &AnalyseItemArray) {
     uint8_t cbCardColor = 0xFF;
-    for (uint8_t i = 0; i < MAX_INDEX; i++) {
+    //萧山麻将：白板为万能财神，可充当任意花色，故清一色判定时忽略财神
+    for (uint8_t i = 0; i < JOKER_INDEX; i++) {
         if (cbCardIndexTemp[i] != 0) {
             uint8_t cbTempCardColor = static_cast<uint8_t>(switchToCardData(i) & MASK_COLOR);
 
