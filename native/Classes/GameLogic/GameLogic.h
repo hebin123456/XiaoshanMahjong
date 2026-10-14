@@ -36,6 +36,7 @@
 #define CHR_TH       0x40    //天胡
 #define CHR_BT       0x80    //爆头（财神作将）
 #define CHR_ZY       0x100   //字一色（全部为字牌/财神）
+#define CHR_HQD      0x200   //豪华七对（七对中含四张相同，×8）
 
 //胡牌方式
 #define CHK_NULL     0x00        //非胡

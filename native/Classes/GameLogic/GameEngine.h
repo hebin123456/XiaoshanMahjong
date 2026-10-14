@@ -153,6 +153,7 @@ public:
     bool estimateUserRespond(uint8_t cbCurrentUser, uint8_t cbCurrentCard, EstimateKind estimateKind);  //检测响应
     bool sendOperateNotify();   //发送操作通知
     bool hasDiscardJoker(uint8_t cbChairID);    //萧山财飘：该玩家本轮是否打出过财神（翻出的财神牌或其替身白板）
+    uint8_t getDiscardFengZiCount(uint8_t cbChairID);  //萧山十风子：该玩家累计打出的字牌数（东南西北中发白，真财神也算一颗）
 
     bool onUserOperateCard(CMD_C_OperateCard OperateCard);
 

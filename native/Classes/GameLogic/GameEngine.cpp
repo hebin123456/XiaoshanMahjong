@@ -674,6 +674,19 @@ bool GameEngine::hasDiscardJoker(uint8_t cbChairID) {
 }
 
 /**
+ * 萧山十风子：统计该玩家累计打出的字牌颗数
+ * 字牌=东南西北中发白（花色0x30），翻出的真财神那张牌也算一颗（白板替身本身即字牌）
+ */
+uint8_t GameEngine::getDiscardFengZiCount(uint8_t cbChairID) {
+    uint8_t cbCount = 0;
+    for (uint8_t i = 0; i < m_cbDiscardCount[cbChairID]; i++) {
+        uint8_t cbCard = m_cbDiscardCard[cbChairID][i];
+        if ((cbCard & MASK_COLOR) == 0x30 || cbCard == GameLogic::s_JokerCard) { cbCount++; }
+    }
+    return cbCount;
+}
+
+/**
  * 游戏结束
  * @param cbChairID
  */
@@ -802,6 +815,12 @@ bool GameEngine::onEventGameConclude(uint8_t cbChairID) {
             if (m_cbProvideUser == m_cbLastBankerUser) {
                 cbChiHuOrder = (cbChiHuOrder * 2 > 64) ? 64 : static_cast<uint8_t>(cbChiHuOrder * 2);
             }
+            //萧山十风子保底：累计打出11颗字牌（含真财神）保底爆头×2，10颗保底基本胡×1
+            {
+                uint8_t cbFengZi = getDiscardFengZiCount(m_cbProvideUser);
+                uint8_t cbFloor = (cbFengZi >= 11) ? 2 : ((cbFengZi >= 10) ? 1 : 0);
+                if (cbFloor > 0 && cbChiHuOrder < cbFloor) { cbChiHuOrder = cbFloor; }
+            }
             //循环累计
             for (uint8_t i = 0; i < m_CurrChair; i++) {
                 if (i != m_cbProvideUser) {
@@ -846,6 +865,12 @@ bool GameEngine::onEventGameConclude(uint8_t cbChairID) {
                     //萧山：庄家（胡牌者或放炮者）加倍
                     if (i == m_cbLastBankerUser || m_cbProvideUser == m_cbLastBankerUser) {
                         cbChiHuOrder = (cbChiHuOrder * 2 > 64) ? 64 : static_cast<uint8_t>(cbChiHuOrder * 2);
+                    }
+                    //萧山十风子保底：累计打出11颗字牌（含真财神）保底爆头×2，10颗保底基本胡×1
+                    {
+                        uint8_t cbFengZi = getDiscardFengZiCount(i);
+                        uint8_t cbFloor = (cbFengZi >= 11) ? 2 : ((cbFengZi >= 10) ? 1 : 0);
+                        if (cbFloor > 0 && cbChiHuOrder < cbFloor) { cbChiHuOrder = cbFloor; }
                     }
                     if (((m_cbHuSpecial[i] & CHS_DH) != 0)) {    //如果是地胡
                         for (uint8_t j = 0; j < m_CurrChair; j++) {

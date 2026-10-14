@@ -436,6 +436,21 @@ uint8_t GameLogic::analyseHuCard(const uint8_t *cbCardIndex, tagWeaveItem *Weave
     huRight |= diaoYu(cbCardIndexTemp, cbCardCountTemp, cbCardIndex, cbCardCount, WeaveItem, cbWeaveCount, AnalyseItemArray);
     //萧山麻将：字一色（全部为字牌）
     huRight |= ziYiSe(cbCardIndexTemp, cbCardCountTemp, cbCardIndex, cbCardCount, WeaveItem, cbWeaveCount, AnalyseItemArray, jokers);
+    //萧山麻将：全风子——手牌与组合全为字牌（真财神万能可充字牌），免拆顺/刻直接认胡，按字一色×16计（极难达成）
+    {
+        bool bAllFengZi = true;
+        for (uint8_t i = 0; i < MAX_INDEX; i++) {
+            if (cbCardIndexTemp[i] != 0 && (switchToCardData(i) & MASK_COLOR) != 0x30) { bAllFengZi = false; break; }
+        }
+        if (bAllFengZi) {
+            for (uint8_t i = 0; i < cbWeaveCount; i++) {
+                if ((WeaveItem[i].cbCenterCard & MASK_COLOR) != 0x30) { bAllFengZi = false; break; }
+            }
+        }
+        if (bAllFengZi) {
+            huRight |= CHR_ZY;
+        }
+    }
     //萧山麻将：爆头（有财神牌且财神牌作将）
     if (jokers > 0 || cbCardIndexTemp[s_JokerIndex] > 0) {
         for (size_t i = 0; i < AnalyseItemArray.size(); i++) {
@@ -466,9 +481,9 @@ uint8_t GameLogic::analyseHuCard(const uint8_t *cbCardIndex, tagWeaveItem *Weave
             huRight = 0x0;
             return WIK_NULL;
         }
-        //萧山麻将：有财神必须爆头（财神作将），手中财神牌且未形成爆头（七对除外）不可胡
+        //萧山麻将：有财神必须爆头（财神作将），手中财神牌且未形成爆头（七对、全风子除外）不可胡
         if (s_RuleFlags.jokerBaoTou && jokers > 0
-            && (huRight & CHR_BT) == 0 && (huRight & CHR_QD) == 0) {
+            && (huRight & CHR_BT) == 0 && (huRight & CHR_QD) == 0 && (huRight & CHR_ZY) == 0) {
             huRight = 0x0;
             return WIK_NULL;
         }
@@ -504,11 +519,12 @@ uint8_t GameLogic::analyseHuCard(const uint8_t *cbCardIndex, tagWeaveItem *Weave
  */
 uint8_t GameLogic::getHuFanShu(const uint64_t huRight, const uint8_t huKind, const uint8_t huSpecial) {
     //萧山麻将倍数表（可叠加，封顶 64 倍）：
-    //自摸×1(基础) | 碰碰胡×2 | 七对×4 | 清七对×8 | 清一色×8 | 字一色×16 | 天胡/地胡×16
+    //自摸×1(基础) | 碰碰胡×2 | 七对×4 | 豪华七对×8 | 清一色/清七对×8 | 字一色×16 | 天胡/地胡×16
     //爆头(财神作将)×2 | 杠开×2
     uint8_t cbFan = 1;
     if ((huRight & CHR_PPH) != 0) cbFan = 2;                        //碰碰胡
     if ((huRight & CHR_QD) != 0) cbFan = 4;                         //七对
+    if ((huRight & CHR_HQD) != 0) cbFan = 8;                        //豪华七对（七对中含四张相同）
     if ((huRight & CHR_QS) != 0) cbFan = 8;                         //清一色(清七对亦为8)
     if ((huRight & CHR_ZY) != 0) cbFan = 16;                        //字一色
     if ((huSpecial & (CHS_TH | CHS_DH)) != 0) cbFan = 16;           //天胡/地胡（存于 huSpecial）
@@ -1094,13 +1110,15 @@ uint64_t GameLogic::pengPengHu(const uint8_t *cbCardIndexTemp, const uint8_t cbC
 uint64_t GameLogic::qiDui(const uint8_t *cbCardIndexTemp, const uint8_t cbCardCountTemp, const uint8_t *cbCardIndex, const uint8_t cbCardCount, tagWeaveItem *WeaveItem, uint8_t cbWeaveCount, CAnalyseItemArray &AnalyseItemArray) {
     //不存在碰、杠
     if (cbWeaveCount > 0) return CHR_NULL;
+    bool bHasFour = false;      //豪华七对：七对中含四张相同的牌
     for (uint8_t i = 0; i < MAX_INDEX; i++) {
         if (cbCardIndexTemp[i] == 1 || cbCardIndexTemp[i] == 3) //牌的数量存在奇数就是不是七对，否则是
         {
             return CHR_NULL;
         }
+        if (cbCardIndexTemp[i] == 4) { bHasFour = true; }
     }
-    return CHR_QD;
+    return bHasFour ? (CHR_QD | CHR_HQD) : CHR_QD;
 }
 
 /**
