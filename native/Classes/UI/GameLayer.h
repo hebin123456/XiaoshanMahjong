@@ -23,6 +23,7 @@ private:
     Node *m_pOperateNotifyGroup;        //操作组
     Node* m_pOutCard;                   //正在出牌的节点
     ui::Text *m_pTextCardNum;           //剩余牌数量
+    Node *m_pCardPile;                  //桌面牌堆（剩余牌墙）
     uint8_t m_MeChairID;                //自己的位置
     uint8_t m_iOutCardTimeOut;          //操作时间
 //游戏变量
@@ -73,6 +74,9 @@ private:
     bool showAndPlayOperateEffect(uint8_t cbViewID,uint8_t cbOperateCode, bool bZm);//播放特效
     bool showTingResult(const uint8_t cbCardIndex[MAX_INDEX], tagWeaveItem WeaveItem[], uint8_t cbWeaveCount);   //显示听牌的结果
     bool showAndUpdateUserScore(const int64_t lGameScoreTable[GAME_PLAYER]);             //更新分数
+    void showCardPile(uint8_t cbCount);                                             //绘制桌面牌堆（剩余牌墙）
+    void popCardPileOne();                                                          //摸牌后牌堆少一张
+    void showJokerCard(uint8_t cbCardData);                                         //显示翻出的财神牌（放在牌堆旁边）
     
 private:
     void removeEffectNode(std::string strNodeName); //移除特效

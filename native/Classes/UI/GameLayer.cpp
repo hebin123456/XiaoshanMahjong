@@ -28,6 +28,7 @@ GameLayer::GameLayer()  : IDialog() {
     m_bMove = false;
     m_pOperateNotifyGroup = NULL;
     m_pTextCardNum = NULL;
+    m_pCardPile = NULL;
     m_pOutCard = NULL;
     m_iOutCardTimeOut = USER_OP_MAX_TIME;
     m_MeChairID = 0;
@@ -116,6 +117,8 @@ bool GameLayer::onGameStartEvent(CMD_S_GameStart GameStart) {
     //界面显示
     m_pTextCardNum->setString(utility::toString((int) m_cbLeftCardCount));
     showAndUpdateUserScore(m_GameEngine->getGameScoreTable());   //刷新总局积分显示
+    showCardPile(m_cbLeftCardCount);                //绘制桌面牌堆（剩余牌墙）
+    showJokerCard(GameStart.cbJokerCard);           //把翻出的财神牌正面朝上放在牌堆旁边
     showAndUpdateHandCard();
     showAndUpdateDiscardCard();
     return true;
@@ -129,6 +132,7 @@ bool GameLayer::onGameStartEvent(CMD_S_GameStart GameStart) {
 bool GameLayer::onSendCardEvent(CMD_S_SendCard SendCard) {
     m_iOutCardTimeOut = USER_OP_MAX_TIME; //重置计时器
     m_cbLeftCardCount--;
+    popCardPileOne();                    //摸一张牌，桌面牌堆少一张
     if (SendCard.cbCurrentUser == m_MeChairID) {
         m_cbCardIndex[m_MeChairID][GameLogic::switchToCardIndex(SendCard.cbCardData)]++;
     }
@@ -449,6 +453,16 @@ bool GameLayer::onGameEndEvent(CMD_S_GameEnd& GameEnd) {
     Node *pTingNode = UIHelper::seekNodeByName(m_PlayerPanel[0], "ting_0");    //隐藏听牌
     pTingNode->setVisible(false);
     this->removeEffectNode("EffectNode");
+    //清除桌面牌堆与翻出的财神牌
+    Node *pPile = m_rootNode->getChildByName("CardPile");
+    if (pPile) {
+        pPile->removeFromParent();
+    }
+    m_pCardPile = NULL;
+    Node *pJoker = m_rootNode->getChildByName("JokerCard");
+    if (pJoker) {
+        pJoker->removeFromParent();
+    }
     this->m_pOperateNotifyGroup->removeAllChildren();
     this->m_pOperateNotifyGroup->setVisible(false);
     //显示结算界面
@@ -530,6 +544,80 @@ bool GameLayer::showSendCard(CMD_S_SendCard SendCard) {
         }
     }
     return true;
+}
+
+/**
+ * 绘制桌面牌堆（剩余牌墙）
+ * 剩余几张牌就叠几张牌背，沿竖直方向轻微错开，形成看得见厚度的牌堆
+ * @param cbCount 剩余牌数量
+ */
+void GameLayer::showCardPile(uint8_t cbCount) {
+    Node *pOld = m_rootNode->getChildByName("CardPile");
+    if (pOld) {
+        pOld->removeFromParent();
+    }
+    m_pCardPile = Node::create();
+    m_pCardPile->setName("CardPile");
+    m_rootNode->addChild(m_pCardPile, 5);   //牌堆压在最底层之上
+    const float kPileX = 520.0f;      //牌堆中心 X（桌面中央左侧，避开中央倒计时轮盘）
+    const float kPileBaseY = 180.0f;  //牌堆底部 Y
+    const float kLayerOffset = 3.00f; //每张牌露出高度
+    uint8_t cbLayer = cbCount;
+    if (cbLayer > 90) {               //防止极端情况下叠层过多
+        cbLayer = 90;
+    }
+    for (uint8_t i = 0; i < cbLayer; i++) {
+        ui::ImageView *pBack = ui::ImageView::create(UIHelper::getBackCardImagePath(0, 0));
+        pBack->setAnchorPoint(Vec2(0.5f, 0.0f));
+        pBack->setPosition(Vec2(kPileX, kPileBaseY + i * kLayerOffset));
+        m_pCardPile->addChild(pBack);
+    }
+}
+
+/**
+ * 摸一张牌，牌堆最上面那张飞走，实现「摸一下少一张」的效果
+ */
+void GameLayer::popCardPileOne() {
+    if (m_pCardPile == NULL) {
+        return;
+    }
+    const auto &aChildren = m_pCardPile->getChildren();
+    if (aChildren.empty()) {
+        return;
+    }
+    Node *pTop = aChildren.back();  //最后添加的是最上面那张
+    //向上抽出并淡出，视觉上从牌堆里被摸走
+    pTop->runAction(Sequence::create(
+            Spawn::create(MoveBy::create(0.20f, Vec2(0.0f, 40.0f)), FadeOut::create(0.20f), nullptr),
+            RemoveSelf::create(),
+            nullptr));
+}
+
+/**
+ * 显示翻出的财神牌：正面朝上放在牌堆旁边
+ * @param cbCardData 翻出的那张财神牌
+ */
+void GameLayer::showJokerCard(uint8_t cbCardData) {
+    Node *pOld = m_rootNode->getChildByName("JokerCard");
+    if (pOld) {
+        pOld->removeFromParent();
+    }
+    if (cbCardData == 0) {
+        return;     //没有翻出财神
+    }
+    Node *pJoker = Node::create();
+    pJoker->setName("JokerCard");
+    pJoker->setPosition(Vec2(436.0f, 360.0f));  //放在牌堆左边
+    m_rootNode->addChild(pJoker, 6);
+    //财神牌正面
+    ui::ImageView *pCard = UIHelper::createDiscardCardImageView(0, cbCardData);
+    pCard->setPosition(Vec2(0.0f, 0.0f));
+    pJoker->addChild(pCard);
+    //「财神」提示
+    ui::Text *pLabel = ui::Text::create("财神", "num.ttf", 22);
+    pLabel->setTextColor(Color4B(255, 40, 40, 255));
+    pLabel->setPosition(Vec2(0.0f, -80.0f));
+    pJoker->addChild(pLabel);
 }
 
 
