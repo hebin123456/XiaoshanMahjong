@@ -25,6 +25,7 @@ public: //AI 强度：0 入门 1 普通 2 高手
 public: //萧山麻将：起始积分与基本分（底分）
     int m_iStartScore;    //起始积分：50 或 100
     int m_iBaseFan;       //基本分（底分）：1 / 2 / 4 / 8，结算=番数×底分
+    int m_iFanCap;        //番数封顶：16 / 32 / 64（连庄倍数与番型合计的上限，默认32）
 
 private:
     GameConfig();

@@ -135,6 +135,7 @@ bool GameLayer::onGameStartEvent(CMD_S_GameStart GameStart) {
     m_pTextCardNum->setString(utility::toString((int) m_cbLeftCardCount));
     showAndUpdateUserScore(m_GameEngine->getGameScoreTable());   //刷新总局积分显示
     showCardWall(GameStart.cbBankerUser, GameStart.cbDice1, GameStart.cbDice2);    //绘制四边牌墙（按骰子留出起牌缺口）
+    showBankerStreakBadge();    //庄家头像角标：庄 / N连庄
     //萧山麻将掷骰：首局每人掷骰定庄（AI自动，真人按钮）；非首局庄家掷骰定起牌位置
     if (GameStart.bFirstGame) {
         showBankerDiceFlow(GameStart);
@@ -987,6 +988,34 @@ void GameLayer::finishGameStartUI(CMD_S_GameStart GameStart) {
     showAndUpdateDiscardCard();
     showJokerCard(GameStart.cbJokerCard);   //财神翻出摆在牌墙旁
     m_GameEngine->onUserDiceConfirm();      //开始发牌（庄家摸第一张）
+}
+
+/**
+ * 庄家头像角标：首庄显示「庄」，连庄显示「N连庄」
+ */
+void GameLayer::showBankerStreakBadge() {
+    for (uint8_t i = 0; i < GAME_PLAYER; i++) {   //清掉旧角标
+        Node *pOld = m_FaceFrame[i]->getChildByName("BankerStreakBadge");
+        if (pOld) { pOld->removeFromParent(); }
+    }
+    if (m_cbBankerChair == INVALID_CHAIR) { return; }
+    uint8_t cbViewID = m_GameEngine->switchViewChairID(m_cbBankerChair, m_MeChairID);
+    uint8_t cbStreak = m_GameEngine->getBankerStreak();
+    if (cbStreak == 0) { cbStreak = 1; }
+    ui::Text *pBadge = ui::Text::create(cbStreak >= 2 ? utility::toString((int) cbStreak, "连庄") : "庄",
+                                        "res/DFYuanW7-GB2312.ttf", 18);
+    if (pBadge == nullptr) { return; }
+    pBadge->setName("BankerStreakBadge");
+    pBadge->setTextColor(Color4B(255, 60, 60, 255));
+    pBadge->enableOutline(Color4B(255, 255, 255, 200), 2);
+    //放在庄家头像正上方
+    ui::ImageView *pImageHeader = dynamic_cast<ui::ImageView *>(UIHelper::seekNodeByName(m_FaceFrame[cbViewID], "Image_Header"));
+    Vec2 pos = (pImageHeader != nullptr)
+               ? Vec2(pImageHeader->getPositionX(),
+                      pImageHeader->getPositionY() + pImageHeader->getContentSize().height * 0.5f + 12.0f)
+               : Vec2(m_FaceFrame[cbViewID]->getContentSize().width * 0.5f, 0.0f);
+    pBadge->setPosition(pos);
+    m_FaceFrame[cbViewID]->addChild(pBadge, 20);
 }
 
 

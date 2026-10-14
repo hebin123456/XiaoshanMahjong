@@ -37,6 +37,9 @@ void GameConfig::loadConfig() {
     m_iStartScore = (iStartScore == 100) ? 100 : 50;
     int iBaseFan = UserDefault::getInstance()->getIntegerForKey("Rule_BaseFan", 1);
     m_iBaseFan = (iBaseFan == 2 || iBaseFan == 4 || iBaseFan == 8) ? iBaseFan : 1;
+    //番数封顶（默认32）
+    int iFanCap = UserDefault::getInstance()->getIntegerForKey("Rule_FanCap", 32);
+    m_iFanCap = (iFanCap == 16 || iFanCap == 64) ? iFanCap : 32;
 }
 
 /**
@@ -50,5 +53,6 @@ void GameConfig::saveConfig() {
     UserDefault::getInstance()->setIntegerForKey("Rule_AiLevel", m_iAiLevel);
     UserDefault::getInstance()->setIntegerForKey("Rule_StartScore", m_iStartScore);
     UserDefault::getInstance()->setIntegerForKey("Rule_BaseFan", m_iBaseFan);
+    UserDefault::getInstance()->setIntegerForKey("Rule_FanCap", m_iFanCap);
 }
 

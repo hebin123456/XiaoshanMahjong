@@ -95,6 +95,7 @@ private:
     uint8_t m_CurrChair;                              //当前椅子数量
 
     uint8_t m_cbBankerUser;                           //庄家用户
+    uint8_t m_cbBankerStreak;                         //连庄数（首局=1，流局+1，换庄重置1，庄家胡牌+1）
     uint8_t m_cbCardIndex[GAME_PLAYER][MAX_INDEX];    //用户扑克
     uint8_t m_cbMa;                                   //买马数量
     uint8_t m_cbProvideCard;                          //当前供应的牌
@@ -152,6 +153,9 @@ public:
     bool sendOperateNotify();   //发送操作通知
     bool hasDiscardJoker(uint8_t cbChairID);    //萧山财飘：该玩家本轮是否打出过财神（翻出的财神牌或其替身白板）
     uint8_t getDiscardFengZiCount(uint8_t cbChairID);  //萧山十风子：该玩家累计打出的字牌数（东南西北中发白，真财神也算一颗）
+    uint8_t getBankerStreak() const { return m_cbBankerStreak; }    //当前连庄数
+    uint8_t getBankerStreakMult();              //萧山连庄倍数：庄×2、二连庄×4、三连庄×8……（2^连庄数，受封顶限制）
+    static uint8_t applyFanCap(int iFan);       //番数按设置封顶（默认32，可在设置中改为16/64）
 
     bool onUserOperateCard(CMD_C_OperateCard OperateCard);
 

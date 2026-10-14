@@ -89,6 +89,7 @@ private:
     void playBankerDiceStep(CMD_S_GameStart GameStart);                             //定庄流程：轮到第几家掷
     void rollBankerDiceAnim(uint8_t cbChair, CMD_S_GameStart GameStart);            //定庄流程：滚动一家掷骰动画并记录点数
     void finishGameStartUI(CMD_S_GameStart GameStart);                              //掷骰结束后：亮手牌、翻财神、开始发牌
+    void showBankerStreakBadge();                                                   //庄家头像角标：显示「庄」/「N连庄」
     int m_iBankerDiceStep;                                                          //定庄流程当前轮到第几家掷骰
 
 private:

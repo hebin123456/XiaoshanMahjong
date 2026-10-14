@@ -3,6 +3,7 @@
 //
 
 #include "GameLogic.h"
+#include "GameConfig.h"
 #include <random>
 #include <cstring>
 #include <functional>
@@ -548,19 +549,20 @@ uint8_t GameLogic::analyseHuCard(const uint8_t *cbCardIndex, tagWeaveItem *Weave
  * @return
  */
 uint8_t GameLogic::getHuFanShu(const uint64_t huRight, const uint8_t huKind, const uint8_t huSpecial) {
-    //萧山麻将倍数表（可叠加，封顶 64 倍）：
+    //萧山麻将倍数表（可叠加，封顶可在设置中配置：16/32/64，默认 32 倍）：
     //自摸×1(基础) | 大对子(碰碰胡)×4 | 七对×4 | 豪华七对×8 | 清七对×8 | 清一色×8 | 字一色×16 | 天胡/地胡×16
     //爆头(财神作将)×2 | 杠开×2
-    uint8_t cbFan = 1;
-    if ((huRight & CHR_PPH) != 0) cbFan = 4;                        //大对子（无顺子，四刻子+将）×4
-    if ((huRight & CHR_QD) != 0) cbFan = 4;                         //七对
-    if ((huRight & CHR_HQD) != 0) cbFan = 8;                        //豪华七对（七对中含四张相同）
-    if ((huRight & CHR_QS) != 0) cbFan = 8;                         //清一色(清七对亦为8)
-    if ((huRight & CHR_ZY) != 0) cbFan = 16;                        //字一色
-    if ((huSpecial & (CHS_TH | CHS_DH)) != 0) cbFan = 16;           //天胡/地胡（存于 huSpecial）
-    if ((huRight & CHR_BT) != 0) cbFan = (cbFan * 2 > 64) ? 64 : static_cast<uint8_t>(cbFan * 2);   //爆头
-    if ((huKind & CHK_GK) != 0) cbFan = (cbFan * 2 > 64) ? 64 : static_cast<uint8_t>(cbFan * 2);    //杠开
-    return cbFan;
+    int iCap = GameConfig::getInstance()->m_iFanCap;    //番数封顶
+    int iFan = 1;
+    if ((huRight & CHR_PPH) != 0) iFan = 4;                        //大对子（无顺子，四刻子+将）×4
+    if ((huRight & CHR_QD) != 0) iFan = 4;                         //七对
+    if ((huRight & CHR_HQD) != 0) iFan = 8;                        //豪华七对（七对中含四张相同）
+    if ((huRight & CHR_QS) != 0) iFan = 8;                         //清一色(清七对亦为8)
+    if ((huRight & CHR_ZY) != 0) iFan = 16;                        //字一色
+    if ((huSpecial & (CHS_TH | CHS_DH)) != 0) iFan = 16;           //天胡/地胡（存于 huSpecial）
+    if ((huRight & CHR_BT) != 0) iFan = (iFan * 2 > iCap) ? iCap : iFan * 2;   //爆头
+    if ((huKind & CHK_GK) != 0) iFan = (iFan * 2 > iCap) ? iCap : iFan * 2;    //杠开
+    return static_cast<uint8_t>(iFan);
 }
 
 /**

@@ -27,12 +27,14 @@ private:
     Label* m_aiLevelLabel;              //AI 强度文本（点击循环切换）
     Label* m_startScoreLabel;           //起始积分文本（点击切换 50/100）
     Label* m_baseFanLabel;              //基本分（底分）文本（点击循环 1/2/4/8）
+    Label* m_fanCapLabel;               //番数封顶文本（点击循环 16/32/64）
 
     void buildRuleSwitches();           //构建规则开关控件
     void refreshRuleLabel(int index);   //刷新单个开关的显示文本
     void refreshAiLevelLabel();         //刷新 AI 强度显示文本
     void refreshStartScoreLabel();      //刷新起始积分显示文本
     void refreshBaseFanLabel();         //刷新基本分显示文本
+    void refreshFanCapLabel();          //刷新番数封顶显示文本
 };
 
 #endif //COCOSTUDIO_MAHJONG_SETLAYER_H

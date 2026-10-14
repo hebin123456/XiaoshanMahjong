@@ -16,6 +16,7 @@ SettingDlg::SettingDlg() : IDialog()
     m_aiLevelLabel = nullptr;
     m_startScoreLabel = nullptr;
     m_baseFanLabel = nullptr;
+    m_fanCapLabel = nullptr;
 }
 SettingDlg::~SettingDlg(){
 }
@@ -163,6 +164,31 @@ void SettingDlg::buildRuleSwitches() {
         }
     };
     _eventDispatcher->addEventListenerWithSceneGraphPriority(fanListener, m_baseFanLabel);
+
+    //番数封顶（点击循环：16→32→64→16，默认32；连庄倍数与番型合计的上限）
+    m_fanCapLabel = Label::createWithTTF("", "DFYuanW7-GB2312.ttf", 28);
+    m_fanCapLabel->setAnchorPoint(Vec2(0.5f, 0.5f));
+    m_fanCapLabel->setPosition(Vec2(anchor.x, anchor.y - 80.0f - (RULE_COUNT + 3) * fLineStep));
+    m_fanCapLabel->setColor(Color3B(255, 235, 130));
+    m_rootNode->addChild(m_fanCapLabel, 10);
+    refreshFanCapLabel();
+
+    auto capListener = EventListenerTouchOneByOne::create();
+    capListener->setSwallowTouches(true);
+    capListener->onTouchBegan = [this](Touch *touch, Event *) -> bool {
+        Vec2 p = m_fanCapLabel->getParent()->convertToNodeSpace(touch->getLocation());
+        return m_fanCapLabel->getBoundingBox().containsPoint(p);
+    };
+    capListener->onTouchEnded = [this](Touch *touch, Event *) {
+        Vec2 p = m_fanCapLabel->getParent()->convertToNodeSpace(touch->getLocation());
+        if (m_fanCapLabel->getBoundingBox().containsPoint(p)) {
+            GameConfig *cfg = GameConfig::getInstance();
+            cfg->m_iFanCap = (cfg->m_iFanCap >= 64) ? 16 : (cfg->m_iFanCap * 2);  //16/32/64 循环
+            refreshFanCapLabel();
+            cfg->saveConfig();
+        }
+    };
+    _eventDispatcher->addEventListenerWithSceneGraphPriority(capListener, m_fanCapLabel);
 }
 
 /**
@@ -208,4 +234,13 @@ void SettingDlg::refreshBaseFanLabel() {
     if (m_baseFanLabel == nullptr) { return; }
     m_baseFanLabel->setString(std::string("基本分：")
             + utility::toString(GameConfig::getInstance()->m_iBaseFan) + " 分");
+}
+
+/**
+ * 刷新番数封顶显示文本
+ */
+void SettingDlg::refreshFanCapLabel() {
+    if (m_fanCapLabel == nullptr) { return; }
+    m_fanCapLabel->setString(std::string("番数封顶：")
+            + utility::toString(GameConfig::getInstance()->m_iFanCap) + " 番");
 }

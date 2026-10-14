@@ -22,6 +22,7 @@ GameEngine *GameEngine::GetGameEngine() {
 GameEngine::GameEngine() {
     m_CurrChair = 0;
     m_cbBankerUser = INVALID_CHAIR;
+    m_cbBankerStreak = 0;
     init();
     resetGameScore();   //萧山麻将：开局每人50分
 }
@@ -85,6 +86,7 @@ void GameEngine::resetGame() {
     }
     m_CurrChair = 0;
     m_cbBankerUser = INVALID_CHAIR;
+    m_cbBankerStreak = 0;   //连庄数复位
     init();
     resetGameScore();
 }
@@ -152,6 +154,7 @@ bool GameEngine::onGameStart() {
         }
         m_cbDice1 = cbBankerDice[m_cbBankerUser][0];
         m_cbDice2 = cbBankerDice[m_cbBankerUser][1];
+        m_cbBankerStreak = 1;          //首局连庄数=1（庄×2）
     } else {
         //非首局：庄家掷两颗骰子定起牌位置（点数和定方位与墩数）
         m_cbDice1 = static_cast<uint8_t>(rand() % 6 + 1);                       //骰子1点数
@@ -707,6 +710,28 @@ uint8_t GameEngine::getDiscardFengZiCount(uint8_t cbChairID) {
 }
 
 /**
+ * 番数按设置封顶（默认32，设置中可改为16/64）
+ */
+uint8_t GameEngine::applyFanCap(int iFan) {
+    int iCap = GameConfig::getInstance()->m_iFanCap;
+    return (iFan > iCap) ? static_cast<uint8_t>(iCap) : static_cast<uint8_t>(iFan);
+}
+
+/**
+ * 萧山连庄倍数：庄×2、二连庄×4、三连庄×8……（2^连庄数）
+ * 倍数本身不超过封顶（如封顶32则最高×32）
+ */
+uint8_t GameEngine::getBankerStreakMult() {
+    int iCap = GameConfig::getInstance()->m_iFanCap;
+    int iMult = 1;
+    for (uint8_t n = 0; n < m_cbBankerStreak && iMult < iCap; n++) {
+        if (iMult * 2 > iCap) { break; }
+        iMult *= 2;
+    }
+    return static_cast<uint8_t>(iMult);
+}
+
+/**
  * 游戏结束
  * @param cbChairID
  */
@@ -825,15 +850,15 @@ bool GameEngine::onEventGameConclude(uint8_t cbChairID) {
             uint8_t cbChiHuOrder = GameLogic::getHuFanShu(m_llHuRight[m_cbProvideUser], m_cbHuKind[m_cbProvideUser], m_cbHuSpecial[m_cbProvideUser]);
             //萧山：暗杠开×4（getHuFanShu 已按明杠开×2计，暗杠再翻一倍）
             if ((m_cbHuKind[m_cbProvideUser] & CHK_GK) != 0 && !m_bLastGangPublic) {
-                cbChiHuOrder = (cbChiHuOrder * 2 > 64) ? 64 : static_cast<uint8_t>(cbChiHuOrder * 2);
+                cbChiHuOrder = applyFanCap(cbChiHuOrder * 2);
             }
             //萧山：财飘×4（本轮打出过财神，且最终仍以财神作将）
             if ((m_llHuRight[m_cbProvideUser] & CHR_BT) != 0 && hasDiscardJoker(m_cbProvideUser)) {
-                cbChiHuOrder = (cbChiHuOrder * 4 > 64) ? 64 : static_cast<uint8_t>(cbChiHuOrder * 4);
+                cbChiHuOrder = applyFanCap(cbChiHuOrder * 4);
             }
-            //萧山：庄家自摸加倍
+            //萧山连庄倍数：庄家自摸按连庄数加倍（庄×2/二连庄×4/三连庄×8……，封顶）
             if (m_cbProvideUser == m_cbLastBankerUser) {
-                cbChiHuOrder = (cbChiHuOrder * 2 > 64) ? 64 : static_cast<uint8_t>(cbChiHuOrder * 2);
+                cbChiHuOrder = applyFanCap(cbChiHuOrder * getBankerStreakMult());
             }
             //萧山十风子保底：累计打出11颗字牌（含真财神）保底爆头×2，10颗保底基本胡×1
             {
@@ -866,6 +891,9 @@ bool GameEngine::onEventGameConclude(uint8_t cbChairID) {
             }
             //庄家设置
             m_cbBankerUser = m_cbProvideUser;
+            //连庄数：庄家自己胡牌继续连庄+1，换庄重置为1
+            m_cbBankerStreak = (m_cbProvideUser == m_cbLastBankerUser)
+                               ? static_cast<uint8_t>(m_cbBankerStreak + 1) : 1;
         } else {
             //捉炮类型，添加一炮多响计分
             uint8_t cbDistance = 0;
@@ -876,15 +904,15 @@ bool GameEngine::onEventGameConclude(uint8_t cbChairID) {
                     uint8_t cbChiHuOrder = GameLogic::getHuFanShu(m_llHuRight[i], m_cbHuKind[i], m_cbHuSpecial[i]);
                     //萧山承包：胡牌者已亮三摊时，放炮者独付并加倍
                     if (GameLogic::s_RuleFlags.allowChiSanTan && m_cbWeaveItemCount[i] >= 3) {
-                        cbChiHuOrder = (cbChiHuOrder * 2 > 64) ? 64 : static_cast<uint8_t>(cbChiHuOrder * 2);
+                        cbChiHuOrder = applyFanCap(cbChiHuOrder * 2);
                     }
                     //萧山：财飘×4（本轮打出过财神，且最终仍以财神作将）
                     if ((m_llHuRight[i] & CHR_BT) != 0 && hasDiscardJoker(i)) {
-                        cbChiHuOrder = (cbChiHuOrder * 4 > 64) ? 64 : static_cast<uint8_t>(cbChiHuOrder * 4);
+                        cbChiHuOrder = applyFanCap(cbChiHuOrder * 4);
                     }
-                    //萧山：庄家（胡牌者或放炮者）加倍
+                    //萧山连庄倍数：庄家（胡牌者或放炮者）按连庄数加倍（庄×2/二连庄×4/三连庄×8……，封顶）
                     if (i == m_cbLastBankerUser || m_cbProvideUser == m_cbLastBankerUser) {
-                        cbChiHuOrder = (cbChiHuOrder * 2 > 64) ? 64 : static_cast<uint8_t>(cbChiHuOrder * 2);
+                        cbChiHuOrder = applyFanCap(cbChiHuOrder * getBankerStreakMult());
                     }
                     //萧山十风子保底：累计打出11颗字牌（含真财神）保底爆头×2，10颗保底基本胡×1
                     {
@@ -995,6 +1023,9 @@ bool GameEngine::onEventGameConclude(uint8_t cbChairID) {
                     if (cbDistance < cbDistanceTemp) {  //一炮多响定庄
                         cbDistance = cbDistanceTemp;
                         m_cbBankerUser = i;    //庄家设置为离自己最近的胡牌玩家
+                        //连庄数：新庄恰为原庄家则+1，否则重置为1
+                        m_cbBankerStreak = (i == m_cbLastBankerUser)
+                                           ? static_cast<uint8_t>(m_cbBankerStreak + 1) : 1;
                     }
                 }
             }
@@ -1002,6 +1033,7 @@ bool GameEngine::onEventGameConclude(uint8_t cbChairID) {
 
     } else {//流局
         GameEnd.cbHuUser = 0x00;        //没人胡牌
+        m_cbBankerStreak++;             //萧山：流局连庄数+1（庄家不变，倍数翻上去）
     }
     //==================================计算桌子总分===========================================
     //萧山麻将：按设置的基本分（底分）放大本局全部积分（结算=番数×底分，杠分同理）
