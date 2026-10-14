@@ -301,9 +301,12 @@ bool GameEngine::estimateUserRespond(uint8_t cbCurrentUser, uint8_t cbCurrentCar
                 }
             }
         }
-        uint8_t cbWeaveCount = m_cbWeaveItemCount[i];                                                    //获取组合牌的总数，既碰或者杠
-        //此处需要处理番数一样不能 ，开始没胡，没过手也不能胡
-        m_cbUserAction[i] |= GameLogic::analyseHuCard(m_cbCardIndex[i], m_WeaveItemArray[i], cbWeaveCount, cbCurrentCard, m_cbHuKind[i], m_llHuRight[i], m_cbHuSpecial[i], m_cbSendCardCount, m_cbOutCardCount, m_bGangStatus, false, m_bQiangGangStatus, m_cbFanShu[i], false);
+        //萧山麻将：财神打出（即「飘」）时不能被点炮胡，放冲只针对普通牌
+        if (!(estimateKind == EstimateKind_OutCard && cbCurrentCard == JOKER_CARD)) {
+            uint8_t cbWeaveCount = m_cbWeaveItemCount[i];                                                    //获取组合牌的总数，既碰或者杠
+            //此处需要处理番数一样不能 ，开始没胡，没过手也不能胡
+            m_cbUserAction[i] |= GameLogic::analyseHuCard(m_cbCardIndex[i], m_WeaveItemArray[i], cbWeaveCount, cbCurrentCard, m_cbHuKind[i], m_llHuRight[i], m_cbHuSpecial[i], m_cbSendCardCount, m_cbOutCardCount, m_bGangStatus, false, m_bQiangGangStatus, m_cbFanShu[i], false);
+        }
         if (m_cbUserAction[i] != WIK_NULL) {                                                            //是否可以胡牌判定
             bAroseAction = true;
         }
