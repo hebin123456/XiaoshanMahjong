@@ -380,6 +380,15 @@ uint8_t GameLogic::analyseHuCard(const uint8_t *cbCardIndex, tagWeaveItem *Weave
     huRight |= qiDui(cbCardIndexTemp, cbCardCountTemp, cbCardIndex, cbCardCount, WeaveItem, cbWeaveCount, AnalyseItemArray);
     //钓鱼
     huRight |= diaoYu(cbCardIndexTemp, cbCardCountTemp, cbCardIndex, cbCardCount, WeaveItem, cbWeaveCount, AnalyseItemArray);
+    //萧山麻将：爆头（有财神且财神作将）
+    if (cbCardIndexTemp[JOKER_INDEX] > 0) {
+        for (size_t i = 0; i < AnalyseItemArray.size(); i++) {
+            if (AnalyseItemArray[i].cbCardEye == JOKER_CARD) {
+                huRight |= CHR_BT;
+                break;
+            }
+        }
+    }
     //********************************分析胡牌类型***************************************************//
     huKind |= ziMo(huRight, bGangStatus, bZimo);            //自摸
     huKind |= gangKai(huRight, bGangStatus, bZimo);         //杠开
@@ -427,7 +436,17 @@ uint8_t GameLogic::analyseHuCard(const uint8_t *cbCardIndex, tagWeaveItem *Weave
  * @return
  */
 uint8_t GameLogic::getHuFanShu(const uint64_t huRight, const uint8_t huKind, const uint8_t huSpecial) {
-    return 1;
+    //萧山麻将倍数表（可叠加，封顶 64 倍）：
+    //自摸×1(基础) | 碰碰胡×2 | 七对×4 | 清七对×8 | 清一色×8 | 天胡/地胡×16
+    //爆头(财神作将)×2 | 杠开×2
+    uint8_t cbFan = 1;
+    if ((huRight & CHR_PPH) != 0) cbFan = 2;                        //碰碰胡
+    if ((huRight & CHR_QD) != 0) cbFan = 4;                         //七对
+    if ((huRight & CHR_QS) != 0) cbFan = 8;                         //清一色(清七对亦为8)
+    if ((huRight & (CHR_TH | CHR_DH)) != 0) cbFan = 16;             //天胡/地胡
+    if ((huRight & CHR_BT) != 0) cbFan = (cbFan * 2 > 64) ? 64 : static_cast<uint8_t>(cbFan * 2);   //爆头
+    if ((huKind & CHK_GK) != 0) cbFan = (cbFan * 2 > 64) ? 64 : static_cast<uint8_t>(cbFan * 2);    //杠开
+    return cbFan;
 }
 
 /**
@@ -595,7 +614,7 @@ void GameLogic::analyseCardJoker(const uint8_t *cbCardIndex, const uint8_t cbCar
     }
     for (uint8_t i = 0; i < JOKER_INDEX; i++) {
         if (counts[i] >= 1 && jokers >= 1) {
-            counts[i] -= 1; eye = switchToCardData(i);
+            counts[i] -= 1; eye = JOKER_CARD;   //财神参与作将 -> 爆头
             curJokers = static_cast<uint8_t>(jokers - 1);
             tryPair();
             counts[i] += 1;

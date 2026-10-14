@@ -34,6 +34,7 @@
 #define CHR_QD       0x10    //七对
 #define CHR_DH       0x20    //地胡
 #define CHR_TH       0x40    //天胡
+#define CHR_BT       0x80    //爆头（财神作将）
 
 //胡牌方式
 #define CHK_NULL     0x00        //非胡
