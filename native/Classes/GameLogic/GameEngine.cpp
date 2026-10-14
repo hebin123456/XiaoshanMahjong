@@ -72,6 +72,20 @@ void GameEngine::resetGameScore() {
 }
 
 /**
+ * 整场复位：清空玩家、重置积分，用于局内退出回到主界面后重新开局
+ */
+void GameEngine::resetGame() {
+    for (uint8_t i = 0; i < m_CurrChair; i++) {
+        CC_SAFE_DELETE(m_pIPlayer[i]);   //AIPlayer会一并释放其AIEngine，RealPlayer持有的是GameLayer不释放
+        m_pIPlayer[i] = nullptr;
+    }
+    m_CurrChair = 0;
+    m_cbBankerUser = INVALID_CHAIR;
+    init();
+    resetGameScore();
+}
+
+/**
  * 玩家进入事件
  * @param pIPlayer
  */

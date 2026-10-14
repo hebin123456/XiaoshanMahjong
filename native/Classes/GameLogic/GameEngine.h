@@ -138,6 +138,7 @@ public:
 
 public:
     void init();    //初始化数据
+    void resetGame();                               //整场复位：清空玩家、重置积分，用于回到主界面后重新开局
     void resetGameScore();                          //重置总局积分（开局每人50分）
     bool onGameStart();     //开始游戏
     bool onGameRestart();   //重新开始

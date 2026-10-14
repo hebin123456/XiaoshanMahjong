@@ -16,6 +16,9 @@ public:
     virtual bool init();
 
     CREATE_FUNC(PlayScene);
+
+protected:
+    virtual void keyBackClicked();
 };
 
 #endif /* defined(__COCOSTUDIO_MAHJONG__PlayScene__) */

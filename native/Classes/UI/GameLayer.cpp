@@ -10,6 +10,7 @@
 #include "GameConfig.h"
 #include "AlertDlg.h"
 #include "DialogManager.h"
+#include "LoadingScene.h"
 
 static uint8_t USER_OP_MAX_TIME = 30; // 出牌倒计时秒数
 
@@ -40,18 +41,17 @@ GameLayer::~GameLayer() {
 
 void GameLayer::onUILoaded() {
     m_btnExit->addClickEventListener([this](Ref* sender) {
-        // 退出游戏按钮
+        // 退出游戏按钮：返回主界面（不退出App）
         auto alert = AlertDlg::create();
         alert->setAlertType(AlertDlg::ENUM_CONFIRM);
         alert->setCallback([]() {
-            Director::getInstance()->end();
-#if (CC_TARGET_PLATFORM == CC_PLATFORM_IOS)
-            exit(0);
-#endif
+            DialogManager::shared()->closeAllDialog();
+            GameEngine::GetGameEngine()->resetGame();       //复位对局与积分，便于回主界面后重新开局
+            Director::getInstance()->replaceScene(LoadingScene::create());
         }, []() {
             DialogManager::shared()->closeAllDialog();
         });
-        alert->setText("退出游戏后，本局游戏将直接结束无法恢复，确定是否退出？");
+        alert->setText("本局游戏将直接结束且无法恢复，确定返回主界面？");
         DialogManager::shared()->showDialog(alert);
     });
     m_btnSetting->addClickEventListener([this](Ref* sender) {
