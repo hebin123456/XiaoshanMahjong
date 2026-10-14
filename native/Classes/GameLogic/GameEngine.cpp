@@ -141,7 +141,7 @@ bool GameEngine::onGameStart() {
     uint8_t cbBankerDice[GAME_PLAYER][2];
     memset(cbBankerDice, 0, sizeof(cbBankerDice));
     if (bFirstGame) {
-        //首局：每人各掷两颗骰子，点数最大者为庄（同点先掷者优先）；庄家那掷兼作起牌骰
+        //首局：每人各掷两颗骰子，点数最大者为庄（同点先掷者优先）
         uint8_t cbMaxSum = 0;
         for (uint8_t i = 0; i < GAME_PLAYER; i++) {
             cbBankerDice[i][0] = static_cast<uint8_t>(rand() % 6 + 1);
@@ -152,14 +152,12 @@ bool GameEngine::onGameStart() {
                 m_cbBankerUser = i;    //确定庄家
             }
         }
-        m_cbDice1 = cbBankerDice[m_cbBankerUser][0];
-        m_cbDice2 = cbBankerDice[m_cbBankerUser][1];
         m_cbBankerStreak = 1;          //首局连庄数=1（庄×2）
-    } else {
-        //非首局：庄家掷两颗骰子定起牌位置（点数和定方位与墩数）
-        m_cbDice1 = static_cast<uint8_t>(rand() % 6 + 1);                       //骰子1点数
-        m_cbDice2 = static_cast<uint8_t>(rand() % 6 + 1);                       //骰子2点数
     }
+    //起牌定位骰：庄家掷两颗（首局为比完大小后的第二次掷骰；非首局直接掷），
+    //点数和定方位与墩数，定位之后才开始发牌
+    m_cbDice1 = static_cast<uint8_t>(rand() % 6 + 1);                       //骰子1点数
+    m_cbDice2 = static_cast<uint8_t>(rand() % 6 + 1);                       //骰子2点数
     iDiceCount = m_cbDice1 + m_cbDice2;                                     //两颗骰子点数和
     m_cbLeftCardCount = sizeof(m_cbRepertoryCard);  //剩余排
     for (uint8_t i = 0; i < m_CurrChair; i++) {

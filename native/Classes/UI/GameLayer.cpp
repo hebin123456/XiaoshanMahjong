@@ -126,8 +126,8 @@ bool GameLayer::onGameStartEvent(CMD_S_GameStart GameStart) {
     m_FaceFrame[1]->runAction(MoveTo::create(0.50f, Vec2(0080.00f, 380.00f)));
     m_FaceFrame[2]->runAction(MoveTo::create(0.50f, Vec2(1060.00f, 640.00f)));
     m_FaceFrame[3]->runAction(MoveTo::create(0.50f, Vec2(1200.00f, 380.00f)));
-    //剩余的牌
-    m_cbLeftCardCount = GameStart.cbLeftCardCount;
+    //剩余的牌：掷骰（定庄/定位）完成前一张未摸，牌墙完整显示136张；发牌后才显示真实剩余数
+    m_cbLeftCardCount = MAX_REPERTORY;
     m_cbBankerChair = GameStart.cbBankerUser;
     cocos2d::log("本局财神（发牌后翻出的那张牌）：%02x，骰子：%d+%d", GameStart.cbJokerCard, GameStart.cbDice1, GameStart.cbDice2);
     GameLogic::switchToCardIndex(GameStart.cbCardData, MAX_COUNT - 1, m_cbCardIndex[m_MeChairID]);
@@ -895,24 +895,22 @@ void GameLayer::showBankerDiceFlow(CMD_S_GameStart GameStart) {
  * 定庄流程：轮到第 m_iBankerDiceStep 家掷骰（真人是自己则显示按钮，AI 自动）
  */
 void GameLayer::playBankerDiceStep(CMD_S_GameStart GameStart) {
-    if (m_iBankerDiceStep >= GAME_PLAYER) {    //四家都掷完：宣布庄家，随后开始发牌
+    if (m_iBankerDiceStep >= GAME_PLAYER) {    //四家都比完：宣布庄家，随后庄家再掷定位骰
         Node *pGroup = m_rootNode->getChildByName("DiceGroup");
         if (pGroup) {
             ui::Text *pTitle = dynamic_cast<ui::Text *>(pGroup->getChildByName("DiceTitle"));
             if (pTitle) {
                 uint8_t cbBankerView = m_GameEngine->switchViewChairID(GameStart.cbBankerUser, m_MeChairID);
                 pTitle->setString(utility::toString(getDiceViewName(cbBankerView), " ",
-                        (int) GameStart.cbDice1, "+", (int) GameStart.cbDice2, " 点最大，成为庄家"));
+                        (int) GameStart.cbBankerDice[GameStart.cbBankerUser][0], "+",
+                        (int) GameStart.cbBankerDice[GameStart.cbBankerUser][1], " 点最大，成为庄家"));
                 pTitle->setTextColor(Color4B(120, 255, 120, 255));
             }
         }
+        //比完大小：庄家再掷一次骰子选定起牌位置，之后才开始发牌
         this->scheduleOnce([this, GameStart](float) {
-            Node *pDice = m_rootNode->getChildByName("DiceGroup");
-            if (pDice) {
-                pDice->runAction(Sequence::create(FadeOut::create(0.30f), RemoveSelf::create(), nullptr));
-            }
-            finishGameStartUI(GameStart);
-        }, 1.40f, "DiceAnimDone");
+            playBankerPositionDice(GameStart);
+        }, 1.20f, "DiceAnimDone");
         return;
     }
     uint8_t cbChair = static_cast<uint8_t>(m_iBankerDiceStep);
@@ -993,10 +991,102 @@ void GameLayer::finishGameStartUI(CMD_S_GameStart GameStart) {
         return;
     }
     m_bDiceConfirmed = true;
+    //定位骰落定后才开始发牌：剩余牌数与牌墙缺口此时才呈现
+    m_cbLeftCardCount = GameStart.cbLeftCardCount;
+    m_pTextCardNum->setString(utility::toString((int) m_cbLeftCardCount));
+    showCardWall(GameStart.cbBankerUser, GameStart.cbDice1, GameStart.cbDice2);    //重绘牌墙（呈现发牌缺口）
     showAndUpdateHandCard();
     showAndUpdateDiscardCard();
     showJokerCard(GameStart.cbJokerCard);   //财神翻出摆在牌墙旁
     m_GameEngine->onUserDiceConfirm();      //开始发牌（庄家摸第一张）
+}
+
+/**
+ * 首局定庄后：庄家再掷一次骰子选定起牌位置（真人是庄家点按钮，AI庄家自动）
+ */
+void GameLayer::playBankerPositionDice(CMD_S_GameStart GameStart) {
+    uint8_t cbBankerView = m_GameEngine->switchViewChairID(GameStart.cbBankerUser, m_MeChairID);
+    bool bMeBanker = (cbBankerView == 0 || GameStart.cbBankerUser == m_MeChairID);
+    cocos2d::log("定位骰阶段：庄家椅子%d 视图%d 我椅子%d 玩家坐庄=%d",
+                 GameStart.cbBankerUser, cbBankerView, m_MeChairID, bMeBanker ? 1 : 0);
+    Node *pGroup = m_rootNode->getChildByName("DiceGroup");
+    if (pGroup) {
+        ui::Text *pTitle = dynamic_cast<ui::Text *>(pGroup->getChildByName("DiceTitle"));
+        if (pTitle) {
+            pTitle->setString(utility::toString(getDiceViewName(cbBankerView), "掷骰定位"));
+            pTitle->setTextColor(Color4B(255, 235, 130, 255));
+        }
+    }
+    if (bMeBanker) {
+        //真人是庄家：显示按钮
+        Node *pOld = m_rootNode->getChildByName("DiceRollBtn");
+        if (pOld) { pOld->removeFromParent(); }
+        ui::Button *pBtn = ui::Button::create("res/GameLayer/btn_action1.png");
+        pBtn->setName("DiceRollBtn");
+        pBtn->setTitleText("掷骰子");
+        pBtn->setTitleFontSize(26);
+        pBtn->setTitleFontName("res/DFYuanW7-GB2312.ttf");
+        pBtn->setScale(0.9f);
+        pBtn->setPosition(Vec2(640.0f, 240.0f));    //骰盘下方
+        pBtn->addClickEventListener([this, GameStart](Ref *) {
+            Node *pSelf = m_rootNode->getChildByName("DiceRollBtn");
+            if (pSelf) { pSelf->removeFromParent(); }
+            rollPositionDiceAnim(GameStart);
+        });
+        m_rootNode->addChild(pBtn, 21);
+    } else {
+        //AI 庄家：自动掷定位骰
+        this->scheduleOnce([this, GameStart](float) {
+            rollPositionDiceAnim(GameStart);
+        }, 0.45f, "AiAutoDice");
+    }
+}
+
+/**
+ * 定位骰动画：两颗骰子滚动落定，显示起牌位置（从哪家牌墙第几墩起牌），随后开始发牌
+ */
+void GameLayer::rollPositionDiceAnim(CMD_S_GameStart GameStart) {
+    Node *pGroup = m_rootNode->getChildByName("DiceGroup");
+    if (pGroup == NULL) { return; }
+    Node *pDie1 = pGroup->getChildByName("Die1");
+    Node *pDie2 = pGroup->getChildByName("Die2");
+    if (pDie1 == NULL || pDie2 == NULL) { return; }
+    uint8_t cbD1 = GameStart.cbDice1;   //定位骰（庄家比完大小后的第二次掷骰）
+    uint8_t cbD2 = GameStart.cbDice2;
+    auto pStep = std::make_shared<int>(0);
+    this->schedule([this, pGroup, pDie1, pDie2, cbD1, cbD2, GameStart, pStep](float) {
+        if (++(*pStep) >= 14) {
+            this->unschedule("DiceRollAnim");
+            setDieFace(pDie1, cbD1);
+            setDieFace(pDie2, cbD2);
+            pDie1->runAction(Sequence::create(ScaleTo::create(0.08f, 1.0f), ScaleTo::create(0.10f, 0.8f), nullptr));
+            pDie2->runAction(Sequence::create(ScaleTo::create(0.08f, 1.0f), ScaleTo::create(0.10f, 0.8f), nullptr));
+            //显示起牌位置（点数和定方位与墩数）
+            uint8_t cbSum = static_cast<uint8_t>(cbD1 + cbD2);
+            const char *strSide = "本家";
+            switch (cbSum) {
+                case 2: case 6: case 10: strSide = "下家"; break;
+                case 3: case 7: case 11: strSide = "对家"; break;
+                case 4: case 8: case 12: strSide = "上家"; break;
+                default: break;
+            }
+            ui::Text *pTitle = dynamic_cast<ui::Text *>(pGroup->getChildByName("DiceTitle"));
+            if (pTitle) {
+                pTitle->setString(utility::toString((int) cbD1, "+", (int) cbD2,
+                        " 从", strSide, "牌墙第", (int) cbSum, "墩起牌"));
+                pTitle->setTextColor(Color4B(255, 235, 130, 255));
+            }
+            this->scheduleOnce([this, pGroup, GameStart](float) {
+                if (pGroup) {
+                    pGroup->runAction(Sequence::create(FadeOut::create(0.30f), RemoveSelf::create(), nullptr));
+                }
+                finishGameStartUI(GameStart);   //定位落定，开始发牌
+            }, 1.00f, "DiceAnimDone");
+        } else {
+            setDieFace(pDie1, static_cast<uint8_t>(rand() % 6 + 1));
+            setDieFace(pDie2, static_cast<uint8_t>(rand() % 6 + 1));
+        }
+    }, 0.07f, "DiceRollAnim");
 }
 
 /**
