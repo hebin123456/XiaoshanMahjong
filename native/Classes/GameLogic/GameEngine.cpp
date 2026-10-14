@@ -134,13 +134,30 @@ bool GameEngine::onGameStart() {
     GameLogic::setRuleFlags(ruleFlags);
 
     GameLogic::shuffle(m_cbRepertoryCard, sizeof(m_cbRepertoryCard));        //洗牌
-    //萧山麻将：庄家掷两颗骰子定起牌位置（点数和定方位与墩数）
-    m_cbDice1 = static_cast<uint8_t>(rand() % 6 + 1);                       //骰子1点数
-    m_cbDice2 = static_cast<uint8_t>(rand() % 6 + 1);                       //骰子2点数
-    iDiceCount = m_cbDice1 + m_cbDice2;                                     //两颗骰子点数和
-    if (m_cbBankerUser == INVALID_CHAIR) {
-        m_cbBankerUser = static_cast<uint8_t>(iDiceCount % GAME_PLAYER);        //确定庄家
+    //萧山麻将掷骰规则
+    bool bFirstGame = (m_cbBankerUser == INVALID_CHAIR);
+    uint8_t cbBankerDice[GAME_PLAYER][2];
+    memset(cbBankerDice, 0, sizeof(cbBankerDice));
+    if (bFirstGame) {
+        //首局：每人各掷两颗骰子，点数最大者为庄（同点先掷者优先）；庄家那掷兼作起牌骰
+        uint8_t cbMaxSum = 0;
+        for (uint8_t i = 0; i < GAME_PLAYER; i++) {
+            cbBankerDice[i][0] = static_cast<uint8_t>(rand() % 6 + 1);
+            cbBankerDice[i][1] = static_cast<uint8_t>(rand() % 6 + 1);
+            uint8_t cbSum = static_cast<uint8_t>(cbBankerDice[i][0] + cbBankerDice[i][1]);
+            if (cbSum > cbMaxSum) {
+                cbMaxSum = cbSum;
+                m_cbBankerUser = i;    //确定庄家
+            }
+        }
+        m_cbDice1 = cbBankerDice[m_cbBankerUser][0];
+        m_cbDice2 = cbBankerDice[m_cbBankerUser][1];
+    } else {
+        //非首局：庄家掷两颗骰子定起牌位置（点数和定方位与墩数）
+        m_cbDice1 = static_cast<uint8_t>(rand() % 6 + 1);                       //骰子1点数
+        m_cbDice2 = static_cast<uint8_t>(rand() % 6 + 1);                       //骰子2点数
     }
+    iDiceCount = m_cbDice1 + m_cbDice2;                                     //两颗骰子点数和
     m_cbLeftCardCount = sizeof(m_cbRepertoryCard);  //剩余排
     for (uint8_t i = 0; i < m_CurrChair; i++) {
         m_cbLeftCardCount -= (MAX_COUNT - 1);            //发牌13张
@@ -161,6 +178,8 @@ bool GameEngine::onGameStart() {
     GameStart.cbCurrentUser = m_cbCurrentUser;
     GameStart.cbLeftCardCount = m_cbLeftCardCount - m_cbMa;
     GameStart.cbJokerCard = GameLogic::s_JokerCard;                  //本局财神牌（翻出的那张牌）
+    memcpy(GameStart.cbBankerDice, cbBankerDice, sizeof(cbBankerDice));  //首局各家掷骰点数
+    GameStart.bFirstGame = bFirstGame;                               //首局：每人掷骰定庄
 
     for (int i = 0; i < m_CurrChair; i++) {      //通知全部玩家开始游戏
         GameLogic::switchToCardData(m_cbCardIndex[i], GameStart.cbCardData, MAX_COUNT);

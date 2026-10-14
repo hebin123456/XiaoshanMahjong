@@ -92,6 +92,7 @@ void GameLayer::initGame() {
     m_cbBankerChair = INVALID_CHAIR;
     m_iWallFirstSlot = -1;
     m_bDiceConfirmed = false;
+    m_iBankerDiceStep = 0;
     memset(&m_cbWeaveItemCount, 0, sizeof(m_cbWeaveItemCount));
     memset(&m_cbDiscardCount, 0, sizeof(m_cbDiscardCount));
     for (uint8_t i = 0; i < GAME_PLAYER; i++) {
@@ -134,8 +135,10 @@ bool GameLayer::onGameStartEvent(CMD_S_GameStart GameStart) {
     m_pTextCardNum->setString(utility::toString((int) m_cbLeftCardCount));
     showAndUpdateUserScore(m_GameEngine->getGameScoreTable());   //刷新总局积分显示
     showCardWall(GameStart.cbBankerUser, GameStart.cbDice1, GameStart.cbDice2);    //绘制四边牌墙（按骰子留出起牌缺口）
-    //萧山麻将：庄家掷两颗骰子定起牌位置——人是庄家点「掷骰子」按钮，AI庄家自动掷；掷完才亮手牌、翻财神、发第一张
-    if (m_GameEngine->switchViewChairID(GameStart.cbBankerUser, m_MeChairID) == 0) {
+    //萧山麻将掷骰：首局每人掷骰定庄（AI自动，真人按钮）；非首局庄家掷骰定起牌位置
+    if (GameStart.bFirstGame) {
+        showBankerDiceFlow(GameStart);
+    } else if (m_GameEngine->switchViewChairID(GameStart.cbBankerUser, m_MeChairID) == 0) {
         showDiceRollButton(GameStart);
     } else {
         this->scheduleOnce([this, GameStart](float) {
@@ -828,6 +831,142 @@ void GameLayer::showDiceRollButton(CMD_S_GameStart GameStart) {
         playDiceAnimation(GameStart);   //点击掷骰（动画开始时移除按钮）
     });
     m_rootNode->addChild(pBtn, 20);
+}
+
+/**
+ * 视图座位名（你/下家/对家/上家）
+ */
+static const char *getDiceViewName(uint8_t cbViewID) {
+    static const char *kViewName[GAME_PLAYER] = {"你", "下家", "对家", "上家"};
+    return kViewName[cbViewID % GAME_PLAYER];
+}
+
+/**
+ * 首局：每人掷骰定庄流程（依次四家掷两颗，点数最大者为庄；AI自动掷，真人点按钮）
+ */
+void GameLayer::showBankerDiceFlow(CMD_S_GameStart GameStart) {
+    m_iBankerDiceStep = 0;
+    Node *pGroup = Node::create();
+    pGroup->setName("DiceGroup");
+    pGroup->setPosition(Vec2(640.0f, 430.0f));
+    m_rootNode->addChild(pGroup, 20);
+    //标题
+    ui::Text *pTitle = ui::Text::create("掷骰定庄", "res/DFYuanW7-GB2312.ttf", 22);
+    pTitle->setName("DiceTitle");
+    pTitle->setTextColor(Color4B(255, 235, 130, 255));
+    pTitle->setPosition(Vec2(0.0f, 70.0f));
+    pGroup->addChild(pTitle);
+    //两颗骰子（滚动时放大、落定回缩）
+    Node *pDie1 = buildDieNode();
+    pDie1->setName("Die1");
+    pDie1->setPosition(Vec2(-34.0f, 18.0f));
+    pDie1->setScale(0.8f);
+    pGroup->addChild(pDie1);
+    Node *pDie2 = buildDieNode();
+    pDie2->setName("Die2");
+    pDie2->setPosition(Vec2(34.0f, 18.0f));
+    pDie2->setScale(0.8f);
+    pGroup->addChild(pDie2);
+    //各家结果行（名字按视图位置，未掷显示灰色「待掷」）
+    for (uint8_t i = 0; i < GAME_PLAYER; i++) {
+        uint8_t cbViewID = m_GameEngine->switchViewChairID(i, m_MeChairID);
+        ui::Text *pText = ui::Text::create(utility::toString(getDiceViewName(cbViewID), "：待掷"),
+                                           "res/DFYuanW7-GB2312.ttf", 18);
+        pText->setName(utility::toString("BankerDice_", (int) i));
+        pText->setTextColor(Color4B(180, 180, 180, 255));
+        pText->setPosition(Vec2(0.0f, -50.0f - cbViewID * 26.0f));
+        pGroup->addChild(pText);
+    }
+    playBankerDiceStep(GameStart);
+}
+
+/**
+ * 定庄流程：轮到第 m_iBankerDiceStep 家掷骰（真人是自己则显示按钮，AI 自动）
+ */
+void GameLayer::playBankerDiceStep(CMD_S_GameStart GameStart) {
+    if (m_iBankerDiceStep >= GAME_PLAYER) {    //四家都掷完：宣布庄家，随后开始发牌
+        Node *pGroup = m_rootNode->getChildByName("DiceGroup");
+        if (pGroup) {
+            ui::Text *pTitle = dynamic_cast<ui::Text *>(pGroup->getChildByName("DiceTitle"));
+            if (pTitle) {
+                uint8_t cbBankerView = m_GameEngine->switchViewChairID(GameStart.cbBankerUser, m_MeChairID);
+                pTitle->setString(utility::toString(getDiceViewName(cbBankerView), " ",
+                        (int) GameStart.cbDice1, "+", (int) GameStart.cbDice2, " 点最大，成为庄家"));
+                pTitle->setTextColor(Color4B(120, 255, 120, 255));
+            }
+        }
+        this->scheduleOnce([this, GameStart](float) {
+            Node *pDice = m_rootNode->getChildByName("DiceGroup");
+            if (pDice) {
+                pDice->runAction(Sequence::create(FadeOut::create(0.30f), RemoveSelf::create(), nullptr));
+            }
+            finishGameStartUI(GameStart);
+        }, 1.40f, "DiceAnimDone");
+        return;
+    }
+    uint8_t cbChair = static_cast<uint8_t>(m_iBankerDiceStep);
+    if (cbChair == m_MeChairID) {
+        //真人掷骰：显示按钮
+        Node *pOld = m_rootNode->getChildByName("DiceRollBtn");
+        if (pOld) { pOld->removeFromParent(); }
+        ui::Button *pBtn = ui::Button::create("res/GameLayer/btn_action1.png");
+        pBtn->setName("DiceRollBtn");
+        pBtn->setTitleText("掷骰子");
+        pBtn->setTitleFontSize(26);
+        pBtn->setTitleFontName("res/DFYuanW7-GB2312.ttf");
+        pBtn->setScale(0.9f);
+        pBtn->setPosition(Vec2(640.0f, 240.0f));    //骰盘下方
+        pBtn->addClickEventListener([this, cbChair, GameStart](Ref *) {
+            Node *pSelf = m_rootNode->getChildByName("DiceRollBtn");
+            if (pSelf) { pSelf->removeFromParent(); }
+            rollBankerDiceAnim(cbChair, GameStart);
+        });
+        m_rootNode->addChild(pBtn, 21);
+    } else {
+        //AI 掷骰：自动
+        this->scheduleOnce([this, cbChair, GameStart](float) {
+            rollBankerDiceAnim(cbChair, GameStart);
+        }, 0.45f, "AiAutoDice");
+    }
+}
+
+/**
+ * 定庄流程：滚动一家掷骰动画，落定后记录点数并轮到下一家
+ */
+void GameLayer::rollBankerDiceAnim(uint8_t cbChair, CMD_S_GameStart GameStart) {
+    Node *pGroup = m_rootNode->getChildByName("DiceGroup");
+    if (pGroup == NULL) { return; }
+    Node *pDie1 = pGroup->getChildByName("Die1");
+    Node *pDie2 = pGroup->getChildByName("Die2");
+    if (pDie1 == NULL || pDie2 == NULL) { return; }
+    uint8_t cbD1 = GameStart.cbBankerDice[cbChair][0];
+    uint8_t cbD2 = GameStart.cbBankerDice[cbChair][1];
+    auto pStep = std::make_shared<int>(0);
+    this->schedule([this, pGroup, pDie1, pDie2, cbChair, cbD1, cbD2, GameStart, pStep](float) {
+        if (++(*pStep) >= 14) {
+            this->unschedule("DiceRollAnim");
+            setDieFace(pDie1, cbD1);
+            setDieFace(pDie2, cbD2);
+            pDie1->runAction(Sequence::create(ScaleTo::create(0.08f, 1.0f), ScaleTo::create(0.10f, 0.8f), nullptr));
+            pDie2->runAction(Sequence::create(ScaleTo::create(0.08f, 1.0f), ScaleTo::create(0.10f, 0.8f), nullptr));
+            //更新该家结果行
+            uint8_t cbViewID = m_GameEngine->switchViewChairID(cbChair, m_MeChairID);
+            ui::Text *pText = dynamic_cast<ui::Text *>(pGroup->getChildByName(utility::toString("BankerDice_", (int) cbChair)));
+            if (pText) {
+                pText->setString(utility::toString(getDiceViewName(cbViewID), "：",
+                        (int) cbD1, "+", (int) cbD2, "＝", (int) (cbD1 + cbD2)));
+                pText->setTextColor(Color4B(255, 255, 255, 255));
+            }
+            //轮到下一家
+            m_iBankerDiceStep++;
+            this->scheduleOnce([this, GameStart](float) {
+                playBankerDiceStep(GameStart);
+            }, 0.35f, "AiAutoDice");
+        } else {
+            setDieFace(pDie1, static_cast<uint8_t>(rand() % 6 + 1));
+            setDieFace(pDie2, static_cast<uint8_t>(rand() % 6 + 1));
+        }
+    }, 0.07f, "DiceRollAnim");
 }
 
 /**

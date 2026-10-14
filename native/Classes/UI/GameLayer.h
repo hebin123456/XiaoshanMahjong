@@ -85,7 +85,11 @@ private:
     void removeDiceNodes();                                                         //清理骰子相关节点与定时任务
     void playDiceAnimation(CMD_S_GameStart GameStart);                              //播放庄家掷骰动画
     void showDiceRollButton(CMD_S_GameStart GameStart);                             //人是庄家时显示掷骰按钮
+    void showBankerDiceFlow(CMD_S_GameStart GameStart);                             //首局：每人掷骰定庄流程（AI自动，真人按钮）
+    void playBankerDiceStep(CMD_S_GameStart GameStart);                             //定庄流程：轮到第几家掷
+    void rollBankerDiceAnim(uint8_t cbChair, CMD_S_GameStart GameStart);            //定庄流程：滚动一家掷骰动画并记录点数
     void finishGameStartUI(CMD_S_GameStart GameStart);                              //掷骰结束后：亮手牌、翻财神、开始发牌
+    int m_iBankerDiceStep;                                                          //定庄流程当前轮到第几家掷骰
 
 private:
     void removeEffectNode(std::string strNodeName); //移除特效

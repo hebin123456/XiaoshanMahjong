@@ -39,6 +39,8 @@ struct CMD_S_GameStart {
     uint8_t cbCardData[MAX_COUNT * GAME_PLAYER]; //扑克列表
     uint8_t cbLeftCardCount;                     //剩余数目
     uint8_t cbJokerCard;                         //本局财神牌（发牌后翻出的那张牌）
+    uint8_t cbBankerDice[GAME_PLAYER][2];        //首局各家掷骰点数（每人两颗，最大者为庄）
+    bool bFirstGame;                             //是否首局（首局走每人掷骰定庄流程）
 };
 
 //出牌命令
