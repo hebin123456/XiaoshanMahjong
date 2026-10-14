@@ -50,6 +50,7 @@ void GameEngine::init() {
     memset(m_cbOperateCard, 0, sizeof(m_cbOperateCard));                              //操作的牌
     memset(m_cbPerformAction, 0, sizeof(m_cbPerformAction));                          //自动默认动作
     memset(m_cbFanShu, 0, sizeof(m_cbFanShu));                                        //结算番数
+    m_bLastGangPublic = true;                                                         //默认按明杠处理
     memset(m_lGameScoreTable, 0, sizeof(m_lGameScoreTable));                          //桌子分
     for (uint8_t i = 0; i < GAME_PLAYER; i++) {
         memset(&m_cbCardIndex[i], 0, sizeof(m_cbCardIndex[i]));
@@ -466,6 +467,7 @@ bool GameEngine::onUserOperateCard(CMD_C_OperateCard OperateCard) {
                 uint8_t cbRemoveCard[] = {cbTargetCard, cbTargetCard, cbTargetCard};                             //设置那三张牌
                 GameLogic::removeCard(m_cbCardIndex[cbTargetUser], cbRemoveCard, sizeof(cbRemoveCard));        //移除那三张牌
                 m_bGangStatus = true;                                                                            //是否可以杠开
+                m_bLastGangPublic = true;                                                                        //直杠他人打出的牌＝明杠
                 break;
             }
             default:
@@ -536,6 +538,7 @@ bool GameEngine::onUserOperateCard(CMD_C_OperateCard OperateCard) {
                 {
                     return true;
                 }
+                m_bLastGangPublic = (GangCardResult.cbPublic[cbGangIndex] == TRUE);                                //记录本次杠为明杠/暗杠
                 uint8_t cbCardIndex = GameLogic::switchToCardIndex(cbOperateCard);                                //将扑克转化成位置
                 if (GangCardResult.cbPublic[cbGangIndex] == TRUE) {                                                 //明杠
                     m_bQiangGangStatus = true;                                                                      //设置是否为能枪杠状态
@@ -723,6 +726,10 @@ bool GameEngine::onEventGameConclude(uint8_t cbChairID) {
         if ((m_llHuRight[m_cbProvideUser] != 0x00) && (FvMask::HasAny(m_cbTargetUser, _MASK_(m_cbProvideUser)))) {
             //翻数计算
             uint8_t cbChiHuOrder = GameLogic::getHuFanShu(m_llHuRight[m_cbProvideUser], m_cbHuKind[m_cbProvideUser], m_cbHuSpecial[m_cbProvideUser]);
+            //萧山：暗杠开×4（getHuFanShu 已按明杠开×2计，暗杠再翻一倍）
+            if ((m_cbHuKind[m_cbProvideUser] & CHK_GK) != 0 && !m_bLastGangPublic) {
+                cbChiHuOrder = (cbChiHuOrder * 2 > 64) ? 64 : static_cast<uint8_t>(cbChiHuOrder * 2);
+            }
             //萧山：庄家自摸加倍
             if (m_cbProvideUser == m_cbLastBankerUser) {
                 cbChiHuOrder = (cbChiHuOrder * 2 > 64) ? 64 : static_cast<uint8_t>(cbChiHuOrder * 2);

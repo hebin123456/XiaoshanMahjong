@@ -107,6 +107,7 @@ private:
     bool m_cbPassPeng[GAME_PLAYER][MAX_INDEX];    //用来检测放弃碰
     bool m_bGangStatus;                           //杠上状态
     bool m_bQiangGangStatus;                      //抢杆状态
+    bool m_bLastGangPublic;                       //最近一次杠是否为明杠（true=明杠×2，false=暗杠×4）
     uint8_t m_cbUserAction[GAME_PLAYER];          //用户动作，可能包含多个动作
     uint8_t m_cbTempUserAction[GAME_PLAYER];      //暂存上一次的动作情况，用来恢复自摸点“过”的情况。
     uint8_t m_cbOperateCard[GAME_PLAYER];         //操作扑克

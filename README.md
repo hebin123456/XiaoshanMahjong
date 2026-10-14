@@ -45,6 +45,8 @@
     - [x] 字一色识别 CHR_ZY（全字牌，财神白板本身即字牌）。
     - [x] `getHuFanShu` 萧山倍数表：碰碰胡×2 / 七对×4 / 清七对×8 / 清一色×8 / 字一色×16 /
       天胡·地胡×16，爆头×2、杠开×2 叠加，封顶 64（已接入引擎结算）。
+    - [x] 明杠开 / 暗杠开区分：`GameEngine` 记录最近一次杠的明/暗（`m_bLastGangPublic`），
+      `getHuFanShu` 按明杠开×2 计，暗杠开在结算时再 ×2（合计 ×4）。
     - [x] 修正：天胡/地胡存于 `huSpecial`，`getHuFanShu` 改读 `huSpecial`（原读 `huRight` 永不生效）。
 
 ---
