@@ -95,7 +95,9 @@ AI 强度（入门/普通/高手）、允许捉冲（点炮胡）、有财神必
 │   ├── cocos2d/                   Cocos2d-x 3.17 引擎源码
 │   ├── cocosstudio/               CocoStudio 运行时
 │   └── proj.android/              Android 打包工程（Gradle + ndk-build）
-└── .github/workflows/android.yml  CI：自动构建 APK 并发布 Release
+├── .github/workflows/android.yml  CI：自动构建 APK 并发布 Release
+├── RULES.md                       萧山麻将规则文档
+└── LICENSE                        MIT 许可证
 ```
 
 ## 构建
@@ -109,7 +111,10 @@ gradle assembleDebug        # 产物：app/build/outputs/apk/debug/app-debug.apk
 也可由 GitHub Actions 自动完成：推送到 `master` → 构建 debug APK → 附加到 Release
 （产物名 `xiaoshan-mahjong.apk`）。
 
-## 素材与授权
+## 规则文档
 
-- 上游工程 **cocostudio-mahjong** 已获得作者授权后并入本项目。
-- 麻将牌贴图与 UI 素材来自上游工程自带资源。
+萧山麻将的完整规则整理见 [RULES.md](RULES.md)（财神、番型倍数、承包、庄家与连庄等）。
+
+## 许可证
+
+本项目以 [MIT License](LICENSE) 开源。
