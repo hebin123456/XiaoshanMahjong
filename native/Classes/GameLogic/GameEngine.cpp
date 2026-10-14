@@ -723,6 +723,10 @@ bool GameEngine::onEventGameConclude(uint8_t cbChairID) {
         if ((m_llHuRight[m_cbProvideUser] != 0x00) && (FvMask::HasAny(m_cbTargetUser, _MASK_(m_cbProvideUser)))) {
             //翻数计算
             uint8_t cbChiHuOrder = GameLogic::getHuFanShu(m_llHuRight[m_cbProvideUser], m_cbHuKind[m_cbProvideUser], m_cbHuSpecial[m_cbProvideUser]);
+            //萧山：庄家自摸加倍
+            if (m_cbProvideUser == m_cbLastBankerUser) {
+                cbChiHuOrder = (cbChiHuOrder * 2 > 64) ? 64 : static_cast<uint8_t>(cbChiHuOrder * 2);
+            }
             //循环累计
             for (uint8_t i = 0; i < m_CurrChair; i++) {
                 if (i != m_cbProvideUser) {
@@ -758,6 +762,10 @@ bool GameEngine::onEventGameConclude(uint8_t cbChairID) {
                     uint8_t cbChiHuOrder = GameLogic::getHuFanShu(m_llHuRight[i], m_cbHuKind[i], m_cbHuSpecial[i]);
                     //萧山承包：胡牌者已亮三摊时，放炮者独付并加倍
                     if (GameLogic::s_RuleFlags.allowChiSanTan && m_cbWeaveItemCount[i] >= 3) {
+                        cbChiHuOrder = (cbChiHuOrder * 2 > 64) ? 64 : static_cast<uint8_t>(cbChiHuOrder * 2);
+                    }
+                    //萧山：庄家（胡牌者或放炮者）加倍
+                    if (i == m_cbLastBankerUser || m_cbProvideUser == m_cbLastBankerUser) {
                         cbChiHuOrder = (cbChiHuOrder * 2 > 64) ? 64 : static_cast<uint8_t>(cbChiHuOrder * 2);
                     }
                     if (((m_cbHuSpecial[i] & CHS_DH) != 0)) {    //如果是地胡
