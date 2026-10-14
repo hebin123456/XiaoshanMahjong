@@ -8,6 +8,18 @@
 #include <functional>
 #include <vector>
 
+//萧山麻将规则开关默认值（保持与上游一致的兼容行为，可由 GameConfig 覆盖）
+GameLogic::RuleFlags GameLogic::s_RuleFlags = { true, false, true };
+
+/**
+ * 设置规则开关
+ * @param flags
+ *  由 GameConfig 注入的规则开关
+ */
+void GameLogic::setRuleFlags(const RuleFlags &flags) {
+    s_RuleFlags = flags;
+}
+
 //麻将牌数据
 static const uint8_t s_MJCardDataArray[MAX_REPERTORY] = {
         0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09,                        //筒子
@@ -405,6 +417,17 @@ uint8_t GameLogic::analyseHuCard(const uint8_t *cbCardIndex, tagWeaveItem *Weave
 
     //结果判断
     if (huRight != 0x0) {                                                   //胡牌
+        //萧山麻将：允许捉冲（点炮胡）开关，关闭后非自摸且非抢杠不可胡
+        if (!bZimo && !bQiangGangStatus && !s_RuleFlags.allowChiHu) {
+            huRight = 0x0;
+            return WIK_NULL;
+        }
+        //萧山麻将：有财神必须爆头（财神作将），手中财神且未形成爆头（七对除外）不可胡
+        if (s_RuleFlags.jokerBaoTou && cbCardIndexTemp[JOKER_INDEX] > 0
+            && (huRight & CHR_BT) == 0 && (huRight & CHR_QD) == 0) {
+            huRight = 0x0;
+            return WIK_NULL;
+        }
         /*
         //有些地方麻将规则胡牌和番数有关，需要在此处理
         uint8_t cbFs = getHuFanShu(huRight, huKind, huSpecial);             //计算番数

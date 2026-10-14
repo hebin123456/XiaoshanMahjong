@@ -14,6 +14,11 @@ class GameConfig {
 public: //音量
     float m_EffectsVolume;
 
+public: //萧山麻将规则开关
+    bool m_bAllowChiHu;        //允许捉冲（点炮胡），关闭则只能自摸
+    bool m_bJokerBaoTou;       //有财神必须爆头（财神作将）
+    bool m_bAllowChiSanTan;    //允许吃三摊（第三个明牌组合触发承包）
+
 private:
     GameConfig();
     ~GameConfig();

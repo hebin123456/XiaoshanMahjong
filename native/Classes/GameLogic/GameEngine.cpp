@@ -4,6 +4,7 @@
 #include "Common.h"
 #include "GameEngine.h"
 #include "IPlayer.h"
+#include "GameConfig.h"
 
 static GameEngine *pGameEngine = NULL;
 
@@ -95,6 +96,13 @@ bool GameEngine::onGameRestart(){
  * 开始游戏事件
  */
 bool GameEngine::onGameStart() {
+    //萧山麻将：把当前规则开关注入逻辑层
+    GameLogic::RuleFlags ruleFlags;
+    ruleFlags.allowChiHu = GameConfig::getInstance()->m_bAllowChiHu;
+    ruleFlags.jokerBaoTou = GameConfig::getInstance()->m_bJokerBaoTou;
+    ruleFlags.allowChiSanTan = GameConfig::getInstance()->m_bAllowChiSanTan;
+    GameLogic::setRuleFlags(ruleFlags);
+
     GameLogic::shuffle(m_cbRepertoryCard, sizeof(m_cbRepertoryCard));        //洗牌
     iDiceCount = static_cast<uint32_t>(rand() % 6 + 1 + rand() % 6 + 1);    //骰子点数
     if (m_cbBankerUser == INVALID_CHAIR) {

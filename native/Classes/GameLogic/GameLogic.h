@@ -117,6 +117,15 @@ public:
     static uint8_t getUserActionRank(uint8_t wUserAction); //动作等级
     static uint8_t getHuFanShu(const uint64_t huRight, const uint8_t huKind, const uint8_t huSpecial); //胡牌分数
 public:
+    //萧山麻将规则开关（由 GameConfig 注入，默认保持兼容行为）
+    struct RuleFlags {
+        bool allowChiHu;        //允许捉冲（点炮胡），关闭则只能自摸
+        bool jokerBaoTou;       //有财神必须爆头（财神作将）
+        bool allowChiSanTan;    //允许吃三摊（承包）
+    };
+    static RuleFlags s_RuleFlags;                            //当前生效的规则开关
+    static void setRuleFlags(const RuleFlags &flags);        //设置规则开关
+public:
     //分析函数
     static uint8_t analyseGangCard(const uint8_t cbCardIndex[MAX_INDEX], tagWeaveItem WeaveItem[], uint8_t cbWeaveCount, tagGangCardResult &GangCardResult); //杠牌分析
     static uint8_t analyseHuCard(const uint8_t cbCardIndex[MAX_INDEX], tagWeaveItem WeaveItem[], uint8_t cbWeaveCount, uint8_t cbCurrentCard, uint8_t &huKind, uint64_t &huRight, uint8_t &huSpecial, const uint8_t cbSendCardCount, const uint8_t cbOutCardCount, const bool bGangStatus, const bool bZimo, const bool bQiangGangStatus, uint8_t &cbFanShu, const bool bCheck);    //胡牌分析，返回胡牌类型
