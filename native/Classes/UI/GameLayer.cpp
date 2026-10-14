@@ -315,7 +315,13 @@ bool GameLayer::onOutCardEvent(CMD_S_OutCard OutCard) {
         ui::ImageView *pHighlight = dynamic_cast<ui::ImageView *>(this->getChildByName( utility::toString("Image_Wheel_", j) ));
         pHighlight->setVisible(false);
     }
-    //萧山麻将：白板是财神的替身——本局财神不是白板时，打出白板按"它所代替的财神牌"报牌名
+    //萧山麻将：打出财神（真身）喊"飘"；白板是财神替身——财神非白板时，打出白板按"它所代替的财神牌"报牌名
+    if (OutCard.cbOutCardData == GameLogic::s_JokerCard) {
+        UIHelper::playSound(utility::toString("raw/Mahjong/"
+                                    , m_GameEngine->getPlayer(OutCard.cbOutCardUser)->getSexAsStr()
+                                    , "/piao.mp3"));     //财飘语音
+        return true;
+    }
     uint8_t cbSoundCard = OutCard.cbOutCardData;
     if (cbSoundCard == WHITE_CARD && GameLogic::s_JokerCard != WHITE_CARD) {
         cbSoundCard = GameLogic::s_JokerCard;
