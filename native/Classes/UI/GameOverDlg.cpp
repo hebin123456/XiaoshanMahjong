@@ -30,13 +30,20 @@ void GameOverDlg::onUILoaded() {
     //
     m_btnClose->addClickEventListener([this](Ref* sender){
         DialogManager::shared()->closeAllDialog();
-        GameEngine::GetGameEngine()->onGameRestart();
+        GameEngine *pEngine = GameEngine::GetGameEngine();
+        if (GameEnd.bSessionEnd) {
+            pEngine->resetGameScore();   //萧山麻将：整场结束（任一家总局积分≤0），重新开局每人50分
+        }
+        pEngine->onGameRestart();        //总局积分跨局累计
     });
 }
 
 void GameOverDlg::showResult() {
     if (GameEnd.cbHuUser == 0x00) {
         m_pOverResultImage->loadTexture("res/GameOverLayer/result_draw.png");  //流局
+    } else if (GameEnd.bSessionEnd) {
+        //萧山麻将：整场结束（任一家总局积分≤0），按总局积分判定最终胜负
+        m_pOverResultImage->loadTexture((GameEnd.lGameScoreTable[m_gameUI->m_MeChairID] <= 0) ? "res/GameOverLayer/result_lose.png" : "res/GameOverLayer/result_win.png");
     } else {
         m_pOverResultImage->loadTexture((GameEnd.lGameScore[m_gameUI->m_MeChairID] < 0) ? "res/GameOverLayer/result_lose.png" : "res/GameOverLayer/result_win.png");
     }
@@ -47,7 +54,11 @@ void GameOverDlg::showResult() {
         ui::ImageView *pOverImgHead = dynamic_cast<ui::ImageView *>(UIHelper::seekNodeByName(pPlayerViewNode, "ImageView_Over_Head")); //头像
         ui::Text *pOverScoreText = dynamic_cast<ui::Text *>(UIHelper::seekNodeByName(pPlayerViewNode, "Text_Over_Score"));       //分数
         pOverImgHead->loadTexture(utility::toString("res/GameLayer/im_defaulthead_", m_gameUI->m_GameEngine->getPlayer(i)->getSexAsInt(), ".png"));    //设置头像
-        pOverScoreText->setString(((GameEnd.lGameScore[i] >= 0) ? utility::toString("+", GameEnd.lGameScore[i]) : utility::toString(GameEnd.lGameScore[i])));
+        if (GameEnd.bSessionEnd) {  //整场结束显示总局积分
+            pOverScoreText->setString(utility::toString(GameEnd.lGameScoreTable[i]));
+        } else {
+            pOverScoreText->setString(((GameEnd.lGameScore[i] >= 0) ? utility::toString("+", GameEnd.lGameScore[i]) : utility::toString(GameEnd.lGameScore[i])));
+        }
         ui::Layout *pOverHandCard = dynamic_cast<ui::Layout *>(UIHelper::seekNodeByName(pPlayerViewNode, "Panel_Over_Hand_Card"));
         pOverHandCard->removeAllChildren();
         ui::ImageView *pOverHuCard = dynamic_cast<ui::ImageView *>(UIHelper::seekNodeByName(pPlayerViewNode, "ImageView_Over_Card"));  //胡的那张

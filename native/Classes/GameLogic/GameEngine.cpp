@@ -23,6 +23,7 @@ GameEngine::GameEngine() {
     m_CurrChair = 0;
     m_cbBankerUser = INVALID_CHAIR;
     init();
+    resetGameScore();   //萧山麻将：开局每人50分
 }
 
 GameEngine::~GameEngine() {
@@ -51,13 +52,22 @@ void GameEngine::init() {
     memset(m_cbPerformAction, 0, sizeof(m_cbPerformAction));                          //自动默认动作
     memset(m_cbFanShu, 0, sizeof(m_cbFanShu));                                        //结算番数
     m_bLastGangPublic = true;                                                         //默认按明杠处理
-    memset(m_lGameScoreTable, 0, sizeof(m_lGameScoreTable));                          //桌子分
+    //萧山麻将：总局积分不按局清零，跨局累计，直至任一家≤0整场结束
     for (uint8_t i = 0; i < GAME_PLAYER; i++) {
         memset(&m_cbCardIndex[i], 0, sizeof(m_cbCardIndex[i]));
         memset(&m_cbPassPeng[i], 0, sizeof(m_cbPassPeng[i]));
         memset(&m_cbDiscardCard[i], 0, sizeof(m_cbDiscardCard[i]));
         m_cbDiscardCount[i] = 0;                                                              //丢弃计数按局清零，避免越界
         memset(&m_WeaveItemArray[i], 0, sizeof(m_WeaveItemArray[i]));
+    }
+}
+
+/**
+ * 萧山麻将：重置总局积分，开局每人GAME_START_SCORE分
+ */
+void GameEngine::resetGameScore() {
+    for (uint8_t i = 0; i < GAME_PLAYER; i++) {
+        m_lGameScoreTable[i] = GAME_START_SCORE;
     }
 }
 
@@ -919,6 +929,13 @@ bool GameEngine::onEventGameConclude(uint8_t cbChairID) {
     }
     for (uint8_t i = 0; i < GAME_PLAYER; i++) {    //赋值总分
         GameEnd.lGameScoreTable[i] = m_lGameScoreTable[i];
+    }
+    //萧山麻将：任一家总局积分≤0，整场结束
+    for (uint8_t i = 0; i < m_CurrChair; i++) {
+        if (m_lGameScoreTable[i] <= 0) {
+            GameEnd.bSessionEnd = true;
+            break;
+        }
     }
     for (uint8_t i = 0; i < m_CurrChair; i++) {
         m_pIPlayer[i]->getGameEngineEventListener()->onGameEndEvent(GameEnd);   //游戏结束事件

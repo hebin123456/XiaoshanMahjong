@@ -94,7 +94,7 @@ bool GameLayer::onUserEnterEvent(IPlayer *pIPlayer) {
         // 显示头像
         ui::ImageView *pImageHeader = dynamic_cast<ui::ImageView *>(UIHelper::seekNodeByName(m_FaceFrame[uChairID], "Image_Header"));  //头像
         ui::Text *pTextScore = dynamic_cast<ui::Text *>(UIHelper::seekNodeByName(m_FaceFrame[uChairID], "Text_Score"));  //头像
-        pTextScore->setString("0");     //进来分数为0
+        pTextScore->setString(utility::toString(m_GameEngine->getGameScoreTable()[uChairID]));     //显示总局积分（开局每人50分）
         pImageHeader->loadTexture(utility::toString("res/GameLayer/im_defaulthead_", pIPlayer->getSexAsInt(), ".png"));    //设置头像
     }
     return true;
@@ -115,6 +115,7 @@ bool GameLayer::onGameStartEvent(CMD_S_GameStart GameStart) {
     GameLogic::switchToCardIndex(GameStart.cbCardData, MAX_COUNT - 1, m_cbCardIndex[m_MeChairID]);
     //界面显示
     m_pTextCardNum->setString(utility::toString((int) m_cbLeftCardCount));
+    showAndUpdateUserScore(m_GameEngine->getGameScoreTable());   //刷新总局积分显示
     showAndUpdateHandCard();
     showAndUpdateDiscardCard();
     return true;
@@ -552,10 +553,10 @@ bool GameLayer::showTingResult(const uint8_t *cbCardIndex, tagWeaveItem *WeaveIt
     return true;
 }
 
-bool GameLayer::showAndUpdateUserScore(int64_t lGameScoreTable[GAME_PLAYER]) {
+bool GameLayer::showAndUpdateUserScore(const int64_t lGameScoreTable[GAME_PLAYER]) {
     for (uint8_t i = 0; i < GAME_PLAYER; i++) {
         uint8_t cbViewID = m_GameEngine->switchViewChairID(i, m_MeChairID);
-        ui::Text *pScore = dynamic_cast<ui::Text *>(UIHelper::seekNodeByName(m_FaceFrame[cbViewID], "Gold_Label"));
+        ui::Text *pScore = dynamic_cast<ui::Text *>(UIHelper::seekNodeByName(m_FaceFrame[cbViewID], "Text_Score"));  //CSB中分数节点名为Text_Score
         if (pScore) {
             pScore->setString(utility::toString(lGameScoreTable[i]));
         }

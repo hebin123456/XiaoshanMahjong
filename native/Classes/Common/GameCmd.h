@@ -90,6 +90,7 @@ struct CMD_S_GameEnd {
     int64_t lNormalGameScore[GAME_PLAYER];                  //单局常规积分
     int64_t lGameScore[GAME_PLAYER];                //单局积分
     int64_t lGameScoreTable[GAME_PLAYER];           //总局积分
+    bool bSessionEnd;                               //萧山麻将：任一家总局积分≤0，整场结束
 };
 
 //出牌命令

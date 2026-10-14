@@ -16,6 +16,8 @@ enum EstimateKind {
     EstimateKind_GangCard,            //杠牌效验
 };
 
+#define GAME_START_SCORE 50    //萧山麻将：开局每人积分
+
 class IGameEngineEventListener {
 
 public:
@@ -136,6 +138,7 @@ public:
 
 public:
     void init();    //初始化数据
+    void resetGameScore();                          //重置总局积分（开局每人50分）
     bool onGameStart();     //开始游戏
     bool onGameRestart();   //重新开始
     bool onUserOutCard(CMD_C_OutCard OutCard);   //出牌命令
@@ -159,6 +162,12 @@ public:
     }
     uint8_t getPlayerCount() const {
         return m_CurrChair;
+    }
+    /**
+     * 获取总局积分表
+     */
+    const int64_t *getGameScoreTable() const {
+        return m_lGameScoreTable;
     }
 };
 
