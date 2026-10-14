@@ -56,6 +56,7 @@ void GameEngine::init() {
         memset(&m_cbCardIndex[i], 0, sizeof(m_cbCardIndex[i]));
         memset(&m_cbPassPeng[i], 0, sizeof(m_cbPassPeng[i]));
         memset(&m_cbDiscardCard[i], 0, sizeof(m_cbDiscardCard[i]));
+        m_cbDiscardCount[i] = 0;                                                              //丢弃计数按局清零，避免越界
         memset(&m_WeaveItemArray[i], 0, sizeof(m_WeaveItemArray[i]));
     }
 }
@@ -610,6 +611,18 @@ bool GameEngine::onUserOperateCard(CMD_C_OperateCard OperateCard) {
 }
 
 /**
+ * 萧山财飘判断：该玩家本轮是否打出过财神（白板）
+ * @param cbChairID
+ * @return
+ */
+bool GameEngine::hasDiscardJoker(uint8_t cbChairID) {
+    for (uint8_t i = 0; i < m_cbDiscardCount[cbChairID]; i++) {
+        if (m_cbDiscardCard[cbChairID][i] == JOKER_CARD) { return true; }
+    }
+    return false;
+}
+
+/**
  * 游戏结束
  * @param cbChairID
  */
@@ -730,6 +743,10 @@ bool GameEngine::onEventGameConclude(uint8_t cbChairID) {
             if ((m_cbHuKind[m_cbProvideUser] & CHK_GK) != 0 && !m_bLastGangPublic) {
                 cbChiHuOrder = (cbChiHuOrder * 2 > 64) ? 64 : static_cast<uint8_t>(cbChiHuOrder * 2);
             }
+            //萧山：财飘×4（本轮打出过财神，且最终仍以财神作将）
+            if ((m_llHuRight[m_cbProvideUser] & CHR_BT) != 0 && hasDiscardJoker(m_cbProvideUser)) {
+                cbChiHuOrder = (cbChiHuOrder * 4 > 64) ? 64 : static_cast<uint8_t>(cbChiHuOrder * 4);
+            }
             //萧山：庄家自摸加倍
             if (m_cbProvideUser == m_cbLastBankerUser) {
                 cbChiHuOrder = (cbChiHuOrder * 2 > 64) ? 64 : static_cast<uint8_t>(cbChiHuOrder * 2);
@@ -770,6 +787,10 @@ bool GameEngine::onEventGameConclude(uint8_t cbChairID) {
                     //萧山承包：胡牌者已亮三摊时，放炮者独付并加倍
                     if (GameLogic::s_RuleFlags.allowChiSanTan && m_cbWeaveItemCount[i] >= 3) {
                         cbChiHuOrder = (cbChiHuOrder * 2 > 64) ? 64 : static_cast<uint8_t>(cbChiHuOrder * 2);
+                    }
+                    //萧山：财飘×4（本轮打出过财神，且最终仍以财神作将）
+                    if ((m_llHuRight[i] & CHR_BT) != 0 && hasDiscardJoker(i)) {
+                        cbChiHuOrder = (cbChiHuOrder * 4 > 64) ? 64 : static_cast<uint8_t>(cbChiHuOrder * 4);
                     }
                     //萧山：庄家（胡牌者或放炮者）加倍
                     if (i == m_cbLastBankerUser || m_cbProvideUser == m_cbLastBankerUser) {
