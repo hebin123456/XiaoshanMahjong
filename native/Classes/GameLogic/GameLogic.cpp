@@ -392,6 +392,8 @@ uint8_t GameLogic::analyseHuCard(const uint8_t *cbCardIndex, tagWeaveItem *Weave
     huRight |= qiDui(cbCardIndexTemp, cbCardCountTemp, cbCardIndex, cbCardCount, WeaveItem, cbWeaveCount, AnalyseItemArray);
     //钓鱼
     huRight |= diaoYu(cbCardIndexTemp, cbCardCountTemp, cbCardIndex, cbCardCount, WeaveItem, cbWeaveCount, AnalyseItemArray);
+    //萧山麻将：字一色（全部为字牌，财神白板本身亦为字牌）
+    huRight |= ziYiSe(cbCardIndexTemp, cbCardCountTemp, cbCardIndex, cbCardCount, WeaveItem, cbWeaveCount, AnalyseItemArray);
     //萧山麻将：爆头（有财神且财神作将）
     if (cbCardIndexTemp[JOKER_INDEX] > 0) {
         for (size_t i = 0; i < AnalyseItemArray.size(); i++) {
@@ -460,13 +462,14 @@ uint8_t GameLogic::analyseHuCard(const uint8_t *cbCardIndex, tagWeaveItem *Weave
  */
 uint8_t GameLogic::getHuFanShu(const uint64_t huRight, const uint8_t huKind, const uint8_t huSpecial) {
     //萧山麻将倍数表（可叠加，封顶 64 倍）：
-    //自摸×1(基础) | 碰碰胡×2 | 七对×4 | 清七对×8 | 清一色×8 | 天胡/地胡×16
+    //自摸×1(基础) | 碰碰胡×2 | 七对×4 | 清七对×8 | 清一色×8 | 字一色×16 | 天胡/地胡×16
     //爆头(财神作将)×2 | 杠开×2
     uint8_t cbFan = 1;
     if ((huRight & CHR_PPH) != 0) cbFan = 2;                        //碰碰胡
     if ((huRight & CHR_QD) != 0) cbFan = 4;                         //七对
     if ((huRight & CHR_QS) != 0) cbFan = 8;                         //清一色(清七对亦为8)
-    if ((huRight & (CHR_TH | CHR_DH)) != 0) cbFan = 16;             //天胡/地胡
+    if ((huRight & CHR_ZY) != 0) cbFan = 16;                        //字一色
+    if ((huSpecial & (CHS_TH | CHS_DH)) != 0) cbFan = 16;           //天胡/地胡（存于 huSpecial）
     if ((huRight & CHR_BT) != 0) cbFan = (cbFan * 2 > 64) ? 64 : static_cast<uint8_t>(cbFan * 2);   //爆头
     if ((huKind & CHK_GK) != 0) cbFan = (cbFan * 2 > 64) ? 64 : static_cast<uint8_t>(cbFan * 2);    //杠开
     return cbFan;
@@ -960,6 +963,35 @@ uint64_t GameLogic::qingSe(const uint8_t *cbCardIndexTemp, const uint8_t cbCardC
     //对号判定
     if (canHu(cbCardIndexTemp, cbCardCountTemp, cbCardIndex, cbCardCount, WeaveItem, cbWeaveCount, AnalyseItemArray)) {
         return CHR_QS;
+    }
+    return CHR_NULL;
+}
+
+/**
+ * 字一色判定（全部由字牌组成；财神白板本身即为字牌，故不影响判定）
+ * @param cbCardIndexTemp
+ * @param cbCardCountTemp
+ * @param cbCardIndex
+ * @param cbCardCount
+ * @param WeaveItem
+ * @param cbWeaveCount
+ * @param AnalyseItemArray
+ * @return
+ */
+uint64_t GameLogic::ziYiSe(const uint8_t *cbCardIndexTemp, const uint8_t cbCardCountTemp, const uint8_t *cbCardIndex, const uint8_t cbCardCount, tagWeaveItem *WeaveItem, uint8_t cbWeaveCount, CAnalyseItemArray &AnalyseItemArray) {
+    //手上牌必须全为字牌（花色 0x3）
+    for (uint8_t i = 0; i < MAX_INDEX; i++) {
+        if (cbCardIndexTemp[i] != 0) {
+            if ((switchToCardData(i) & MASK_COLOR) != 0x30) { return CHR_NULL; }
+        }
+    }
+    //组合牌必须全为字牌
+    for (uint8_t i = 0; i < cbWeaveCount; i++) {
+        if ((WeaveItem[i].cbCenterCard & MASK_COLOR) != 0x30) return CHR_NULL;
+    }
+    //对号判定
+    if (canHu(cbCardIndexTemp, cbCardCountTemp, cbCardIndex, cbCardCount, WeaveItem, cbWeaveCount, AnalyseItemArray)) {
+        return CHR_ZY;
     }
     return CHR_NULL;
 }

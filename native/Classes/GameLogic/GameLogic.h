@@ -35,6 +35,7 @@
 #define CHR_DH       0x20    //地胡
 #define CHR_TH       0x40    //天胡
 #define CHR_BT       0x80    //爆头（财神作将）
+#define CHR_ZY       0x100   //字一色（全部为字牌/财神）
 
 //胡牌方式
 #define CHK_NULL     0x00        //非胡
@@ -140,6 +141,7 @@ private:
     //胡牌类型
     static uint64_t pingHu(const uint8_t cbCardIndexTemp[MAX_INDEX], const uint8_t cbCardCountTemp, const uint8_t cbCardIndex[MAX_INDEX], const uint8_t cbCardCount, tagWeaveItem WeaveItem[], uint8_t cbWeaveCount, CAnalyseItemArray &AnalyseItemArray); //平胡
     static uint64_t qingSe(const uint8_t cbCardIndexTemp[MAX_INDEX], const uint8_t cbCardCountTemp, const uint8_t cbCardIndex[MAX_INDEX], const uint8_t cbCardCount, tagWeaveItem WeaveItem[], uint8_t cbWeaveCount, CAnalyseItemArray &AnalyseItemArray); //清一色
+    static uint64_t ziYiSe(const uint8_t cbCardIndexTemp[MAX_INDEX], const uint8_t cbCardCountTemp, const uint8_t cbCardIndex[MAX_INDEX], const uint8_t cbCardCount, tagWeaveItem WeaveItem[], uint8_t cbWeaveCount, CAnalyseItemArray &AnalyseItemArray); //字一色
     static uint64_t pengPengHu(const uint8_t cbCardIndexTemp[MAX_INDEX], const uint8_t cbCardCountTemp, const uint8_t cbCardIndex[MAX_INDEX], const uint8_t cbCardCount, tagWeaveItem WeaveItem[], uint8_t cbWeaveCount, CAnalyseItemArray &AnalyseItemArray);//碰碰胡
     static uint64_t qiDui(const uint8_t cbCardIndexTemp[MAX_INDEX], const uint8_t cbCardCountTemp, const uint8_t cbCardIndex[MAX_INDEX], const uint8_t cbCardCount, tagWeaveItem WeaveItem[], uint8_t cbWeaveCount, CAnalyseItemArray &AnalyseItemArray);//七对
     static uint64_t diaoYu(const uint8_t cbCardIndexTemp[MAX_INDEX], const uint8_t cbCardCountTemp, const uint8_t cbCardIndex[MAX_INDEX], const uint8_t cbCardCount, tagWeaveItem WeaveItem[], uint8_t cbWeaveCount, CAnalyseItemArray &AnalyseItemArray);//单钓
