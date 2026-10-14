@@ -24,9 +24,11 @@ private:
     ui::Slider * m_pSliderVolume;   //声音滑动条
     Label* m_ruleLabels[RULE_COUNT];    //规则开关文本（可点击切换）
     bool*  m_ruleValues[RULE_COUNT];    //规则开关对应的配置值
+    Label* m_aiLevelLabel;              //AI 强度文本（点击循环切换）
 
     void buildRuleSwitches();           //构建规则开关控件
     void refreshRuleLabel(int index);   //刷新单个开关的显示文本
+    void refreshAiLevelLabel();         //刷新 AI 强度显示文本
 };
 
 #endif //COCOSTUDIO_MAHJONG_SETLAYER_H

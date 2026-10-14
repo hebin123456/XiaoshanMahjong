@@ -43,6 +43,7 @@ public:
 protected:
     //操作
     void sendCard();
+    uint8_t chooseDiscardCard();     //按 AI 强度选择要打出的牌
 
 };
 

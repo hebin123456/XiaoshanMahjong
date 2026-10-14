@@ -5,6 +5,7 @@
 #include "AIEngine.h"
 #include "IPlayer.h"
 #include "DelayCall.h"
+#include "GameConfig.h"
 
 AIEngine::AIEngine() {
     m_GameEngine = GameEngine::GetGameEngine();
@@ -68,6 +69,8 @@ bool AIEngine::onSendCardEvent(CMD_S_SendCard SendCard) {
             memcpy(OperateNotify.cbGangCard, SendCard.cbGangCard, sizeof(OperateNotify.cbGangCard));
             onOperateNotifyEvent(OperateNotify);
         } else {
+            //按 AI 强度选择出牌（默认打法为直接打出刚摸的牌）
+            m_cbSendCardData = chooseDiscardCard();
             DelayCall::add([this]() { sendCard(); }, time(NULL) % 2 + 0.8f);
         }
     }
@@ -138,9 +141,7 @@ bool AIEngine::onOperateResultEvent(CMD_S_OperateResult OperateResult) {
             if (OperateResult.cbOperateUser == m_MeChairID) { //自己出牌操作
                 uint8_t cbReomveCard[] = {OperateResult.cbOperateCard, OperateResult.cbOperateCard};
                 GameLogic::removeCard(m_cbCardIndex[OperateResult.cbOperateUser], cbReomveCard, sizeof(cbReomveCard));
-                uint8_t cbTempCardData[MAX_COUNT] = {0};
-                GameLogic::switchToCardData(m_cbCardIndex[m_MeChairID], cbTempCardData, static_cast<uint8_t>(MAX_COUNT - 1 - (m_cbWeaveItemCount[m_MeChairID] * 3))); //碰完需要出一张
-                m_cbSendCardData = cbTempCardData[0];
+                m_cbSendCardData = chooseDiscardCard();
                 DelayCall::add([this]() { sendCard(); }, time(NULL) % 2 + 0.5f);
             }
             break;
@@ -199,5 +200,53 @@ void AIEngine::sendCard() {
     memset(&OutCard, 0, sizeof(CMD_C_OutCard));
     OutCard.cbCardData = m_cbSendCardData;
     m_GameEngine->onUserOutCard(OutCard);
+}
+
+/**
+ * 按 AI 强度选择要打出的牌
+ * 0 入门：直接打出刚摸到的牌
+ * 1 普通：结构评估，优先打出孤张，保留对子/搭子，不主动打财神
+ * 2 高手：在普通基础上偏好打出已现身的「熟张」（降低放炮风险）
+ * @return 要打出的牌
+ */
+uint8_t AIEngine::chooseDiscardCard() {
+    int level = GameConfig::getInstance()->m_iAiLevel;
+    if (level <= 0) { return m_cbSendCardData; }   //入门：直接打出摸到的牌
+
+    const uint8_t *counts = m_cbCardIndex[m_MeChairID];
+    uint8_t bestCard = 0;
+    int bestScore = 0x7FFFFFFF;
+    bool found = false;
+    for (uint8_t i = 0; i < MAX_INDEX; i++) {
+        if (counts[i] == 0) { continue; }
+        uint8_t card = GameLogic::switchToCardData(i);
+        if (card == JOKER_CARD) { continue; }      //财神为万能牌，不主动打出
+
+        uint8_t value = static_cast<uint8_t>(i % 9);
+        int score = counts[i] * 30;                //对子/刻子价值高，优先保留
+        if (i < 27) {                              //数牌：看同花色相邻搭子
+            if (value >= 1 && counts[i - 1] > 0) { score += 12; }
+            if (value <= 7 && counts[i + 1] > 0) { score += 12; }
+            if (value >= 2 && counts[i - 2] > 0) { score += 6; }
+            if (value <= 6 && counts[i + 2] > 0) { score += 6; }
+        }
+        if (level >= 2) {                          //高手：熟张更安全，降低保留倾向
+            bool bSafe = false;
+            for (uint8_t p = 0; p < GAME_PLAYER && !bSafe; p++) {
+                if (p == m_MeChairID) { continue; }
+                for (uint8_t d = 0; d < m_cbDiscardCount[p]; d++) {
+                    if (m_cbDiscardCard[p][d] == card) { bSafe = true; break; }
+                }
+            }
+            if (bSafe) { score -= 20; }
+        }
+        if (!found || score < bestScore) {
+            bestScore = score;
+            bestCard = card;
+            found = true;
+        }
+    }
+    if (!found) { return m_cbSendCardData; }       //手上只剩财神时，只能打出摸到的牌
+    return bestCard;
 }
 

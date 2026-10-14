@@ -12,6 +12,7 @@ SettingDlg::SettingDlg() : IDialog()
     RegDialogCtrl("Button_Close", m_btnClose);
     RegDialogCtrl("Slider_Volume", m_pSliderVolume);
     for (int i = 0; i < RULE_COUNT; i++) { m_ruleLabels[i] = nullptr; m_ruleValues[i] = nullptr; }
+    m_aiLevelLabel = nullptr;
 }
 SettingDlg::~SettingDlg(){
 }
@@ -83,6 +84,31 @@ void SettingDlg::buildRuleSwitches() {
         };
         _eventDispatcher->addEventListenerWithSceneGraphPriority(listener, label);
     }
+
+    //AI 强度（点击循环切换：入门→普通→高手）
+    m_aiLevelLabel = Label::createWithTTF("", "DFYuanW7-GB2312.ttf", 28);
+    m_aiLevelLabel->setAnchorPoint(Vec2(0.5f, 0.5f));
+    m_aiLevelLabel->setPosition(Vec2(anchor.x, anchor.y - 90.0f - RULE_COUNT * 46.0f));
+    m_aiLevelLabel->setColor(Color3B(255, 255, 255));
+    m_rootNode->addChild(m_aiLevelLabel, 10);
+    refreshAiLevelLabel();
+
+    auto aiListener = EventListenerTouchOneByOne::create();
+    aiListener->setSwallowTouches(true);
+    aiListener->onTouchBegan = [this](Touch *touch, Event *) -> bool {
+        Vec2 p = m_aiLevelLabel->getParent()->convertToNodeSpace(touch->getLocation());
+        return m_aiLevelLabel->getBoundingBox().containsPoint(p);
+    };
+    aiListener->onTouchEnded = [this](Touch *touch, Event *) {
+        Vec2 p = m_aiLevelLabel->getParent()->convertToNodeSpace(touch->getLocation());
+        if (m_aiLevelLabel->getBoundingBox().containsPoint(p)) {
+            GameConfig *cfg = GameConfig::getInstance();
+            cfg->m_iAiLevel = (cfg->m_iAiLevel + 1) % 3;   //循环切换
+            refreshAiLevelLabel();
+            cfg->saveConfig();
+        }
+    };
+    _eventDispatcher->addEventListenerWithSceneGraphPriority(aiListener, m_aiLevelLabel);
 }
 
 /**
@@ -99,4 +125,15 @@ void SettingDlg::refreshRuleLabel(int index) {
     bool on = *m_ruleValues[index];
     m_ruleLabels[index]->setString(std::string(kRuleTitles[index]) + "：" + (on ? "开" : "关"));
     m_ruleLabels[index]->setColor(on ? Color3B(120, 255, 120) : Color3B(200, 200, 200));
+}
+
+/**
+ * 刷新 AI 强度显示文本
+ */
+void SettingDlg::refreshAiLevelLabel() {
+    static const char *kLevels[3] = {"入门", "普通", "高手"};
+    if (m_aiLevelLabel == nullptr) { return; }
+    int lv = GameConfig::getInstance()->m_iAiLevel;
+    if (lv < 0 || lv > 2) { lv = 1; }
+    m_aiLevelLabel->setString(std::string("AI 强度：") + kLevels[lv]);
 }

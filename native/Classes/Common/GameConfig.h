@@ -19,6 +19,9 @@ public: //萧山麻将规则开关
     bool m_bJokerBaoTou;       //有财神必须爆头（财神作将）
     bool m_bAllowChiSanTan;    //允许吃三摊（第三个明牌组合触发承包）
 
+public: //AI 强度：0 入门 1 普通 2 高手
+    int m_iAiLevel;
+
 private:
     GameConfig();
     ~GameConfig();
