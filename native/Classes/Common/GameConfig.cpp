@@ -32,6 +32,11 @@ void GameConfig::loadConfig() {
     m_bJokerBaoTou = UserDefault::getInstance()->getBoolForKey("Rule_JokerBaoTou", false);
     m_bAllowChiSanTan = UserDefault::getInstance()->getBoolForKey("Rule_AllowChiSanTan", true);
     m_iAiLevel = UserDefault::getInstance()->getIntegerForKey("Rule_AiLevel", 1);
+    //起始积分（默认50）与基本分（默认1）
+    int iStartScore = UserDefault::getInstance()->getIntegerForKey("Rule_StartScore", 50);
+    m_iStartScore = (iStartScore == 100) ? 100 : 50;
+    int iBaseFan = UserDefault::getInstance()->getIntegerForKey("Rule_BaseFan", 1);
+    m_iBaseFan = (iBaseFan == 2 || iBaseFan == 4 || iBaseFan == 8) ? iBaseFan : 1;
 }
 
 /**
@@ -43,5 +48,7 @@ void GameConfig::saveConfig() {
     UserDefault::getInstance()->setBoolForKey("Rule_JokerBaoTou", m_bJokerBaoTou);
     UserDefault::getInstance()->setBoolForKey("Rule_AllowChiSanTan", m_bAllowChiSanTan);
     UserDefault::getInstance()->setIntegerForKey("Rule_AiLevel", m_iAiLevel);
+    UserDefault::getInstance()->setIntegerForKey("Rule_StartScore", m_iStartScore);
+    UserDefault::getInstance()->setIntegerForKey("Rule_BaseFan", m_iBaseFan);
 }
 

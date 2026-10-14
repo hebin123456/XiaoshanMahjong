@@ -16,8 +16,6 @@ enum EstimateKind {
     EstimateKind_GangCard,            //杠牌效验
 };
 
-#define GAME_START_SCORE 50    //萧山麻将：开局每人积分
-
 class IGameEngineEventListener {
 
 public:

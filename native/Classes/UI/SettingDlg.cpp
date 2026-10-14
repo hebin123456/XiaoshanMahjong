@@ -13,6 +13,8 @@ SettingDlg::SettingDlg() : IDialog()
     RegDialogCtrl("Slider_Volume", m_pSliderVolume);
     for (int i = 0; i < RULE_COUNT; i++) { m_ruleLabels[i] = nullptr; m_ruleValues[i] = nullptr; }
     m_aiLevelLabel = nullptr;
+    m_startScoreLabel = nullptr;
+    m_baseFanLabel = nullptr;
 }
 SettingDlg::~SettingDlg(){
 }
@@ -57,10 +59,11 @@ void SettingDlg::buildRuleSwitches() {
     Vec2 anchor = m_rootNode->convertToNodeSpace(
             m_pSliderVolume->getParent()->convertToWorldSpace(m_pSliderVolume->getPosition()));
 
+    const float fLineStep = 42.0f;  //行距（紧凑排布：3规则+AI+起始积分+基本分 共6行）
     for (int i = 0; i < RULE_COUNT; i++) {
         Label *label = Label::createWithTTF("", "DFYuanW7-GB2312.ttf", 28);
         label->setAnchorPoint(Vec2(0.5f, 0.5f));
-        label->setPosition(Vec2(anchor.x, anchor.y - 90.0f - i * 46.0f));
+        label->setPosition(Vec2(anchor.x, anchor.y - 80.0f - i * fLineStep));
         label->setColor(Color3B(255, 255, 255));
         m_rootNode->addChild(label, 10);
         m_ruleLabels[i] = label;
@@ -88,7 +91,7 @@ void SettingDlg::buildRuleSwitches() {
     //AI 强度（点击循环切换：入门→普通→高手）
     m_aiLevelLabel = Label::createWithTTF("", "DFYuanW7-GB2312.ttf", 28);
     m_aiLevelLabel->setAnchorPoint(Vec2(0.5f, 0.5f));
-    m_aiLevelLabel->setPosition(Vec2(anchor.x, anchor.y - 90.0f - RULE_COUNT * 46.0f));
+    m_aiLevelLabel->setPosition(Vec2(anchor.x, anchor.y - 80.0f - RULE_COUNT * fLineStep));
     m_aiLevelLabel->setColor(Color3B(255, 255, 255));
     m_rootNode->addChild(m_aiLevelLabel, 10);
     refreshAiLevelLabel();
@@ -109,6 +112,56 @@ void SettingDlg::buildRuleSwitches() {
         }
     };
     _eventDispatcher->addEventListenerWithSceneGraphPriority(aiListener, m_aiLevelLabel);
+
+    //起始积分（点击切换：50 ↔ 100）
+    m_startScoreLabel = Label::createWithTTF("", "DFYuanW7-GB2312.ttf", 28);
+    m_startScoreLabel->setAnchorPoint(Vec2(0.5f, 0.5f));
+    m_startScoreLabel->setPosition(Vec2(anchor.x, anchor.y - 80.0f - (RULE_COUNT + 1) * fLineStep));
+    m_startScoreLabel->setColor(Color3B(255, 235, 130));
+    m_rootNode->addChild(m_startScoreLabel, 10);
+    refreshStartScoreLabel();
+
+    auto scoreListener = EventListenerTouchOneByOne::create();
+    scoreListener->setSwallowTouches(true);
+    scoreListener->onTouchBegan = [this](Touch *touch, Event *) -> bool {
+        Vec2 p = m_startScoreLabel->getParent()->convertToNodeSpace(touch->getLocation());
+        return m_startScoreLabel->getBoundingBox().containsPoint(p);
+    };
+    scoreListener->onTouchEnded = [this](Touch *touch, Event *) {
+        Vec2 p = m_startScoreLabel->getParent()->convertToNodeSpace(touch->getLocation());
+        if (m_startScoreLabel->getBoundingBox().containsPoint(p)) {
+            GameConfig *cfg = GameConfig::getInstance();
+            cfg->m_iStartScore = (cfg->m_iStartScore == 50) ? 100 : 50;    //50/100 循环
+            refreshStartScoreLabel();
+            cfg->saveConfig();
+        }
+    };
+    _eventDispatcher->addEventListenerWithSceneGraphPriority(scoreListener, m_startScoreLabel);
+
+    //基本分/起始倍数（点击循环：1→2→4→8→1）
+    m_baseFanLabel = Label::createWithTTF("", "DFYuanW7-GB2312.ttf", 28);
+    m_baseFanLabel->setAnchorPoint(Vec2(0.5f, 0.5f));
+    m_baseFanLabel->setPosition(Vec2(anchor.x, anchor.y - 80.0f - (RULE_COUNT + 2) * fLineStep));
+    m_baseFanLabel->setColor(Color3B(255, 235, 130));
+    m_rootNode->addChild(m_baseFanLabel, 10);
+    refreshBaseFanLabel();
+
+    auto fanListener = EventListenerTouchOneByOne::create();
+    fanListener->setSwallowTouches(true);
+    fanListener->onTouchBegan = [this](Touch *touch, Event *) -> bool {
+        Vec2 p = m_baseFanLabel->getParent()->convertToNodeSpace(touch->getLocation());
+        return m_baseFanLabel->getBoundingBox().containsPoint(p);
+    };
+    fanListener->onTouchEnded = [this](Touch *touch, Event *) {
+        Vec2 p = m_baseFanLabel->getParent()->convertToNodeSpace(touch->getLocation());
+        if (m_baseFanLabel->getBoundingBox().containsPoint(p)) {
+            GameConfig *cfg = GameConfig::getInstance();
+            cfg->m_iBaseFan = (cfg->m_iBaseFan >= 8) ? 1 : (cfg->m_iBaseFan * 2);  //1/2/4/8 循环
+            refreshBaseFanLabel();
+            cfg->saveConfig();
+        }
+    };
+    _eventDispatcher->addEventListenerWithSceneGraphPriority(fanListener, m_baseFanLabel);
 }
 
 /**
@@ -136,4 +189,22 @@ void SettingDlg::refreshAiLevelLabel() {
     int lv = GameConfig::getInstance()->m_iAiLevel;
     if (lv < 0 || lv > 2) { lv = 1; }
     m_aiLevelLabel->setString(std::string("AI 强度：") + kLevels[lv]);
+}
+
+/**
+ * 刷新起始积分显示文本
+ */
+void SettingDlg::refreshStartScoreLabel() {
+    if (m_startScoreLabel == nullptr) { return; }
+    m_startScoreLabel->setString(std::string("起始积分：")
+            + utility::toString(GameConfig::getInstance()->m_iStartScore) + " 分");
+}
+
+/**
+ * 刷新基本分显示文本
+ */
+void SettingDlg::refreshBaseFanLabel() {
+    if (m_baseFanLabel == nullptr) { return; }
+    m_baseFanLabel->setString(std::string("基本分：")
+            + utility::toString(GameConfig::getInstance()->m_iBaseFan) + " 分");
 }

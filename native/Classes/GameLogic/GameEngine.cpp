@@ -66,11 +66,12 @@ void GameEngine::init() {
 }
 
 /**
- * 萧山麻将：重置总局积分，开局每人GAME_START_SCORE分
+ * 萧山麻将：重置总局积分，每人按设置的起始积分（默认50）
  */
 void GameEngine::resetGameScore() {
+    int64_t lStartScore = GameConfig::getInstance()->m_iStartScore;
     for (uint8_t i = 0; i < GAME_PLAYER; i++) {
-        m_lGameScoreTable[i] = GAME_START_SCORE;
+        m_lGameScoreTable[i] = lStartScore;
     }
 }
 
@@ -984,6 +985,15 @@ bool GameEngine::onEventGameConclude(uint8_t cbChairID) {
         GameEnd.cbHuUser = 0x00;        //没人胡牌
     }
     //==================================计算桌子总分===========================================
+    //萧山麻将：按设置的基本分（底分）放大本局全部积分（结算=番数×底分，杠分同理）
+    int64_t lBaseFan = GameConfig::getInstance()->m_iBaseFan;
+    if (lBaseFan > 1) {
+        for (uint8_t i = 0; i < GAME_PLAYER; i++) {
+            GameEnd.lGameScore[i] *= lBaseFan;
+            GameEnd.lNormalGameScore[i] *= lBaseFan;
+            GameEnd.lMaGameScore[i] *= lBaseFan;
+        }
+    }
     for (uint8_t i = 0; i < GAME_PLAYER; i++) {
         m_lGameScoreTable[i] += GameEnd.lGameScore[i];
     }
