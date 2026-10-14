@@ -36,6 +36,7 @@ struct CMD_S_GameStart {
     uint8_t cbCurrentUser;                       //当前用户
     uint8_t cbCardData[MAX_COUNT * GAME_PLAYER]; //扑克列表
     uint8_t cbLeftCardCount;                     //剩余数目
+    uint8_t cbJokerCard;                         //本局财神牌（发牌后翻出的那张牌）
 };
 
 //出牌命令

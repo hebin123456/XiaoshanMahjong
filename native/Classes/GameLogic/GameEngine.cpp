@@ -115,6 +115,8 @@ bool GameEngine::onGameStart() {
         m_cbLeftCardCount -= (MAX_COUNT - 1);            //发牌13张
         GameLogic::switchToCardIndex(&m_cbRepertoryCard[m_cbLeftCardCount], MAX_COUNT - 1, m_cbCardIndex[i]); //初始化用户扑克到 m_cbCardIndex 数组
     }
+    //萧山麻将：翻财神——四家各摸13张后，翻出下一张牌作为本局财神（万能牌），该牌翻出后置于牌墙外不再发牌
+    GameLogic::setJoker(m_cbRepertoryCard[--m_cbLeftCardCount]);
     //设置变量
     m_cbProvideCard = 0;            //初始化供应扑克
     m_cbProvideUser = INVALID_CHAIR;    //初始化供应玩家
@@ -125,6 +127,7 @@ bool GameEngine::onGameStart() {
     GameStart.cbBankerUser = m_cbBankerUser;
     GameStart.cbCurrentUser = m_cbCurrentUser;
     GameStart.cbLeftCardCount = m_cbLeftCardCount - m_cbMa;
+    GameStart.cbJokerCard = GameLogic::s_JokerCard;                  //本局财神牌（翻出的那张牌）
 
     for (int i = 0; i < m_CurrChair; i++) {      //通知全部玩家开始游戏
         GameLogic::switchToCardData(m_cbCardIndex[i], GameStart.cbCardData, MAX_COUNT);
@@ -282,8 +285,8 @@ bool GameEngine::estimateUserRespond(uint8_t cbCurrentUser, uint8_t cbCurrentCar
         {
             //萧山麻将：未开启吃三摊时，每家最多 2 摊（明牌组合），不能碰/杠第 3 摊
             bool bSanTanLimit = (!GameLogic::s_RuleFlags.allowChiSanTan && m_cbWeaveItemCount[i] >= 2);
-            //萧山麻将：白板为万能财神，打出后其余三家不能吃/碰/杠（但可以胡）
-            if (cbCurrentCard != JOKER_CARD && !bSanTanLimit) {
+            //萧山麻将：打出财神（翻出的财神牌或其替身白板）后，其余三家不能吃/碰/杠（但可以胡）
+            if (!GameLogic::isJokerRelated(cbCurrentCard) && !bSanTanLimit) {
                 if (!m_cbPassPeng[i][GameLogic::switchToCardIndex(cbCurrentCard)])            //检测可以碰牌、没碰上家的牌不能碰对家和下家的
                 {
                     m_cbUserAction[i] |= GameLogic::estimatePengCard(m_cbCardIndex[i], cbCurrentCard);    //碰牌判断
@@ -301,8 +304,8 @@ bool GameEngine::estimateUserRespond(uint8_t cbCurrentUser, uint8_t cbCurrentCar
                 }
             }
         }
-        //萧山麻将：财神打出（即「飘」）时不能被点炮胡，放冲只针对普通牌
-        if (!(estimateKind == EstimateKind_OutCard && cbCurrentCard == JOKER_CARD)) {
+        //萧山麻将：打出财神（翻出的财神牌或其替身白板，即「飘」）时不能被点炮胡，放冲只针对普通牌
+        if (!(estimateKind == EstimateKind_OutCard && GameLogic::isJokerRelated(cbCurrentCard))) {
             uint8_t cbWeaveCount = m_cbWeaveItemCount[i];                                                    //获取组合牌的总数，既碰或者杠
             //此处需要处理番数一样不能 ，开始没胡，没过手也不能胡
             m_cbUserAction[i] |= GameLogic::analyseHuCard(m_cbCardIndex[i], m_WeaveItemArray[i], cbWeaveCount, cbCurrentCard, m_cbHuKind[i], m_llHuRight[i], m_cbHuSpecial[i], m_cbSendCardCount, m_cbOutCardCount, m_bGangStatus, false, m_bQiangGangStatus, m_cbFanShu[i], false);
@@ -614,13 +617,13 @@ bool GameEngine::onUserOperateCard(CMD_C_OperateCard OperateCard) {
 }
 
 /**
- * 萧山财飘判断：该玩家本轮是否打出过财神（白板）
+ * 萧山财飘判断：该玩家本轮是否打出过财神（翻出的财神牌或其替身白板）
  * @param cbChairID
  * @return
  */
 bool GameEngine::hasDiscardJoker(uint8_t cbChairID) {
     for (uint8_t i = 0; i < m_cbDiscardCount[cbChairID]; i++) {
-        if (m_cbDiscardCard[cbChairID][i] == JOKER_CARD) { return true; }
+        if (GameLogic::isJokerRelated(m_cbDiscardCard[cbChairID][i])) { return true; }
     }
     return false;
 }

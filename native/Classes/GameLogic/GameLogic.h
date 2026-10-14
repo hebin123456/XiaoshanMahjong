@@ -11,9 +11,9 @@
 #define    MASK_COLOR                    0xF0                                //花色掩码
 #define    MASK_VALUE                    0x0F                                //数值掩码
 
-//萧山麻将：白板(z7 / 0x37)为万能财神
-#define JOKER_CARD                    0x37                                //财神牌（白板）
-#define JOKER_INDEX                   33                                  //财神在索引表中的位置 (3*9 + 7 - 1)
+//萧山麻将：发牌后翻出的那张牌 = 本局财神（万能牌）；白板 = 财神的替身（只当财神那张牌用）
+#define WHITE_CARD                    0x37                                //白板（财神的替身）
+#define WHITE_INDEX                   33                                  //白板在索引表中的位置 (3*9 + 7 - 1)
 
 #define FALSE        0
 #define TRUE         1
@@ -127,21 +127,28 @@ public:
     static RuleFlags s_RuleFlags;                            //当前生效的规则开关
     static void setRuleFlags(const RuleFlags &flags);        //设置规则开关
 public:
+    //本局财神（发牌后翻出的那张牌，万能牌）；白板为财神的替身，只当财神那张牌用
+    static uint8_t s_JokerCard;                              //本局财神牌（万能牌）
+    static uint8_t s_JokerIndex;                             //本局财神牌在索引表中的位置
+    static void setJoker(uint8_t cbCardData);                //设置本局财神
+    static bool isJokerCard(uint8_t cbCardData);             //是否为本局财神牌（翻出的那张牌，万能牌）
+    static bool isJokerRelated(uint8_t cbCardData);          //是否为本局财神牌或其替身白板（打出即"飘"）
+public:
     //分析函数
     static uint8_t analyseGangCard(const uint8_t cbCardIndex[MAX_INDEX], tagWeaveItem WeaveItem[], uint8_t cbWeaveCount, tagGangCardResult &GangCardResult); //杠牌分析
     static uint8_t analyseHuCard(const uint8_t cbCardIndex[MAX_INDEX], tagWeaveItem WeaveItem[], uint8_t cbWeaveCount, uint8_t cbCurrentCard, uint8_t &huKind, uint64_t &huRight, uint8_t &huSpecial, const uint8_t cbSendCardCount, const uint8_t cbOutCardCount, const bool bGangStatus, const bool bZimo, const bool bQiangGangStatus, uint8_t &cbFanShu, const bool bCheck);    //胡牌分析，返回胡牌类型
     static uint8_t analyseHuCardCount(const uint8_t cbCardIndex[MAX_INDEX], tagWeaveItem WeaveItem[], uint8_t cbWeaveCount);    //获取胡牌的数量
-    static bool analyseCard(const uint8_t cbCardIndex[MAX_INDEX], const uint8_t cbCardCount, tagWeaveItem WeaveItem[], uint8_t cbItemCount, CAnalyseItemArray &AnalyseItemArray); //分析扑克
-    static void analyseCardJoker(const uint8_t cbCardIndex[MAX_INDEX], const uint8_t cbCardCount, tagWeaveItem WeaveItem[], uint8_t cbItemCount, CAnalyseItemArray &AnalyseItemArray); //含财神（白板万能）时的分析扑克
+    static bool analyseCard(const uint8_t cbCardIndex[MAX_INDEX], const uint8_t cbCardCount, tagWeaveItem WeaveItem[], uint8_t cbItemCount, CAnalyseItemArray &AnalyseItemArray, const uint8_t jokers); //分析扑克
+    static void analyseCardJoker(const uint8_t cbCardIndex[MAX_INDEX], const uint8_t cbCardCount, tagWeaveItem WeaveItem[], uint8_t cbItemCount, CAnalyseItemArray &AnalyseItemArray, const uint8_t jokers); //含财神（万能牌）时的分析扑克
     static bool analyseTingCard(const uint8_t cbCardIndex[MAX_INDEX], tagWeaveItem WeaveItem[], uint8_t cbWeaveCount);    //是否听牌
     static bool analyseCanHuCard(const uint8_t cbCardIndex[MAX_INDEX], tagWeaveItem WeaveItem[], uint8_t cbWeaveCount, uint8_t cbCurrentCard);   //分析是否可以胡牌
     static bool analyseTingCardResult(const uint8_t cbCardIndex[MAX_INDEX], tagWeaveItem WeaveItem[], uint8_t cbWeaveCount , tagTingResult& tingResult);
-    static bool canHu(const uint8_t cbCardIndexTemp[MAX_INDEX], const uint8_t cbCardCountTemp, const uint8_t cbCardIndex[MAX_INDEX], const uint8_t cbCardCount, tagWeaveItem WeaveItem[], uint8_t cbWeaveCount, CAnalyseItemArray &AnalyseItemArray); //能胡牌
+    static bool canHu(const uint8_t cbCardIndexTemp[MAX_INDEX], const uint8_t cbCardCountTemp, const uint8_t cbCardIndex[MAX_INDEX], const uint8_t cbCardCount, tagWeaveItem WeaveItem[], uint8_t cbWeaveCount, CAnalyseItemArray &AnalyseItemArray, const uint8_t jokers); //能胡牌
 private:
     //胡牌类型
     static uint64_t pingHu(const uint8_t cbCardIndexTemp[MAX_INDEX], const uint8_t cbCardCountTemp, const uint8_t cbCardIndex[MAX_INDEX], const uint8_t cbCardCount, tagWeaveItem WeaveItem[], uint8_t cbWeaveCount, CAnalyseItemArray &AnalyseItemArray); //平胡
-    static uint64_t qingSe(const uint8_t cbCardIndexTemp[MAX_INDEX], const uint8_t cbCardCountTemp, const uint8_t cbCardIndex[MAX_INDEX], const uint8_t cbCardCount, tagWeaveItem WeaveItem[], uint8_t cbWeaveCount, CAnalyseItemArray &AnalyseItemArray); //清一色
-    static uint64_t ziYiSe(const uint8_t cbCardIndexTemp[MAX_INDEX], const uint8_t cbCardCountTemp, const uint8_t cbCardIndex[MAX_INDEX], const uint8_t cbCardCount, tagWeaveItem WeaveItem[], uint8_t cbWeaveCount, CAnalyseItemArray &AnalyseItemArray); //字一色
+    static uint64_t qingSe(const uint8_t cbCardIndexTemp[MAX_INDEX], const uint8_t cbCardCountTemp, const uint8_t cbCardIndex[MAX_INDEX], const uint8_t cbCardCount, tagWeaveItem WeaveItem[], uint8_t cbWeaveCount, CAnalyseItemArray &AnalyseItemArray, const uint8_t jokers); //清一色
+    static uint64_t ziYiSe(const uint8_t cbCardIndexTemp[MAX_INDEX], const uint8_t cbCardCountTemp, const uint8_t cbCardIndex[MAX_INDEX], const uint8_t cbCardCount, tagWeaveItem WeaveItem[], uint8_t cbWeaveCount, CAnalyseItemArray &AnalyseItemArray, const uint8_t jokers); //字一色
     static uint64_t pengPengHu(const uint8_t cbCardIndexTemp[MAX_INDEX], const uint8_t cbCardCountTemp, const uint8_t cbCardIndex[MAX_INDEX], const uint8_t cbCardCount, tagWeaveItem WeaveItem[], uint8_t cbWeaveCount, CAnalyseItemArray &AnalyseItemArray);//碰碰胡
     static uint64_t qiDui(const uint8_t cbCardIndexTemp[MAX_INDEX], const uint8_t cbCardCountTemp, const uint8_t cbCardIndex[MAX_INDEX], const uint8_t cbCardCount, tagWeaveItem WeaveItem[], uint8_t cbWeaveCount, CAnalyseItemArray &AnalyseItemArray);//七对
     static uint64_t diaoYu(const uint8_t cbCardIndexTemp[MAX_INDEX], const uint8_t cbCardCountTemp, const uint8_t cbCardIndex[MAX_INDEX], const uint8_t cbCardCount, tagWeaveItem WeaveItem[], uint8_t cbWeaveCount, CAnalyseItemArray &AnalyseItemArray);//单钓

@@ -111,6 +111,7 @@ bool GameLayer::onGameStartEvent(CMD_S_GameStart GameStart) {
     //剩余的牌
     m_cbLeftCardCount = GameStart.cbLeftCardCount;
     m_cbBankerChair = GameStart.cbBankerUser;
+    cocos2d::log("本局财神（发牌后翻出的那张牌）：%02x", GameStart.cbJokerCard);
     GameLogic::switchToCardIndex(GameStart.cbCardData, MAX_COUNT - 1, m_cbCardIndex[m_MeChairID]);
     //界面显示
     m_pTextCardNum->setString(utility::toString((int) m_cbLeftCardCount));

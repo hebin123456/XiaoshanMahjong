@@ -220,7 +220,7 @@ uint8_t AIEngine::chooseDiscardCard() {
     for (uint8_t i = 0; i < MAX_INDEX; i++) {
         if (counts[i] == 0) { continue; }
         uint8_t card = GameLogic::switchToCardData(i);
-        if (card == JOKER_CARD) { continue; }      //财神为万能牌，不主动打出
+        if (GameLogic::isJokerRelated(card)) { continue; }   //财神牌与替身白板为宝贵牌，不主动打出
 
         uint8_t value = static_cast<uint8_t>(i % 9);
         int score = counts[i] * 30;                //对子/刻子价值高，优先保留
@@ -246,7 +246,7 @@ uint8_t AIEngine::chooseDiscardCard() {
             found = true;
         }
     }
-    if (!found) { return m_cbSendCardData; }       //手上只剩财神时，只能打出摸到的牌
+    if (!found) { return m_cbSendCardData; }       //手上只剩财神/白板时，只能打出摸到的牌
     return bestCard;
 }
 

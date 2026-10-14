@@ -20,6 +20,40 @@ void GameLogic::setRuleFlags(const RuleFlags &flags) {
     s_RuleFlags = flags;
 }
 
+//本局财神（发牌后翻出的那张牌，万能牌）。
+//此处仅作兜底初值：正常流程每局开始都会翻一张牌并调用 setJoker() 覆盖。
+uint8_t GameLogic::s_JokerCard = WHITE_CARD;
+uint8_t GameLogic::s_JokerIndex = WHITE_INDEX;
+
+/**
+ * 设置本局财神（翻出的那张牌）
+ * @param cbCardData 财神牌
+ */
+void GameLogic::setJoker(uint8_t cbCardData) {
+    s_JokerCard = cbCardData;
+    s_JokerIndex = switchToCardIndex(cbCardData);
+}
+
+/**
+ * 是否为本局财神牌（翻出的那张牌，万能牌）
+ * @param cbCardData
+ * @return
+ */
+bool GameLogic::isJokerCard(uint8_t cbCardData) {
+    return cbCardData == s_JokerCard;
+}
+
+/**
+ * 是否为本局财神牌或其替身白板
+ * 萧山麻将：打出财神即为「飘」——翻出的财神牌本身、以及财神的替身白板，
+ * 打出后均按飘处理（该牌不能被吃/碰/杠、不能被点炮胡）。
+ * @param cbCardData
+ * @return
+ */
+bool GameLogic::isJokerRelated(uint8_t cbCardData) {
+    return cbCardData == s_JokerCard || cbCardData == WHITE_CARD;
+}
+
 //麻将牌数据
 static const uint8_t s_MJCardDataArray[MAX_REPERTORY] = {
         0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09,                        //筒子
@@ -377,27 +411,35 @@ uint8_t GameLogic::analyseHuCard(const uint8_t *cbCardIndex, tagWeaveItem *Weave
     uint8_t cbCardCountTemp = getCardCount(cbCardIndexTemp);
     uint8_t cbCardCount = static_cast<uint8_t>(cbCardCountTemp - 1);
     //=================构造扑克结束
+    //萧山麻将：归一化——本局财神牌为万能牌（单独抽出计数 jokers）；
+    //白板为财神的替身，只当财神那张牌用，故并入财神索引作为普通牌
+    uint8_t jokers = cbCardIndexTemp[s_JokerIndex];
+    cbCardIndexTemp[s_JokerIndex] = 0;
+    if (s_JokerIndex != WHITE_INDEX) {
+        cbCardIndexTemp[s_JokerIndex] += cbCardIndexTemp[WHITE_INDEX];
+        cbCardIndexTemp[WHITE_INDEX] = 0;
+    }
     //分析扑克
     CAnalyseItemArray AnalyseItemArray;
     AnalyseItemArray.clear();
-    analyseCard(cbCardIndexTemp, cbCardCountTemp, WeaveItem, cbWeaveCount, AnalyseItemArray);
+    analyseCard(cbCardIndexTemp, cbCardCountTemp, WeaveItem, cbWeaveCount, AnalyseItemArray, jokers);
     //*********************************分析胡牌方式开始**********************************************//
     //平胡
     huRight |= pingHu(cbCardIndexTemp, cbCardCountTemp, cbCardIndex, cbCardCount, WeaveItem, cbWeaveCount, AnalyseItemArray);
     //碰碰胡
     huRight |= pengPengHu(cbCardIndexTemp, cbCardCountTemp, cbCardIndex, cbCardCount, WeaveItem, cbWeaveCount, AnalyseItemArray);
     //清一色
-    huRight |= qingSe(cbCardIndexTemp, cbCardCountTemp, cbCardIndex, cbCardCount, WeaveItem, cbWeaveCount, AnalyseItemArray);
+    huRight |= qingSe(cbCardIndexTemp, cbCardCountTemp, cbCardIndex, cbCardCount, WeaveItem, cbWeaveCount, AnalyseItemArray, jokers);
     //七对
     huRight |= qiDui(cbCardIndexTemp, cbCardCountTemp, cbCardIndex, cbCardCount, WeaveItem, cbWeaveCount, AnalyseItemArray);
     //钓鱼
     huRight |= diaoYu(cbCardIndexTemp, cbCardCountTemp, cbCardIndex, cbCardCount, WeaveItem, cbWeaveCount, AnalyseItemArray);
-    //萧山麻将：字一色（全部为字牌，财神白板本身亦为字牌）
-    huRight |= ziYiSe(cbCardIndexTemp, cbCardCountTemp, cbCardIndex, cbCardCount, WeaveItem, cbWeaveCount, AnalyseItemArray);
-    //萧山麻将：爆头（有财神且财神作将）
-    if (cbCardIndexTemp[JOKER_INDEX] > 0) {
+    //萧山麻将：字一色（全部为字牌）
+    huRight |= ziYiSe(cbCardIndexTemp, cbCardCountTemp, cbCardIndex, cbCardCount, WeaveItem, cbWeaveCount, AnalyseItemArray, jokers);
+    //萧山麻将：爆头（有财神牌且财神牌作将）
+    if (jokers > 0 || cbCardIndexTemp[s_JokerIndex] > 0) {
         for (size_t i = 0; i < AnalyseItemArray.size(); i++) {
-            if (AnalyseItemArray[i].cbCardEye == JOKER_CARD) {
+            if (AnalyseItemArray[i].cbCardEye == s_JokerCard) {
                 huRight |= CHR_BT;
                 break;
             }
@@ -424,8 +466,8 @@ uint8_t GameLogic::analyseHuCard(const uint8_t *cbCardIndex, tagWeaveItem *Weave
             huRight = 0x0;
             return WIK_NULL;
         }
-        //萧山麻将：有财神必须爆头（财神作将），手中财神且未形成爆头（七对除外）不可胡
-        if (s_RuleFlags.jokerBaoTou && cbCardIndexTemp[JOKER_INDEX] > 0
+        //萧山麻将：有财神必须爆头（财神作将），手中财神牌且未形成爆头（七对除外）不可胡
+        if (s_RuleFlags.jokerBaoTou && jokers > 0
             && (huRight & CHR_BT) == 0 && (huRight & CHR_QD) == 0) {
             huRight = 0x0;
             return WIK_NULL;
@@ -508,26 +550,27 @@ uint8_t GameLogic::analyseHuCardCount(const uint8_t *cbCardIndex, tagWeaveItem *
 }
 
 /**
- * 含财神（白板万能）时的分析扑克
- * 把白板从普通牌中抽出当作万能牌，枚举「将牌 + 若干面子」的所有拆分方式，
+ * 含财神（万能牌）时的分析扑克
+ * 财神牌（翻出的那张牌）为万能牌，可顶替任意牌；白板已在调用方归一化为
+ * 「财神那张牌」的普通牌。枚举「将牌 + 若干面子」的所有拆分方式，
  * 结果写入 AnalyseItemArray，供平胡/碰碰胡/清一色等番型函数复用。
  * @param cbCardIndex
- *  手上的牌（含财神）
+ *  手上的牌（白板已并入财神索引，自然财神牌已抽出）
  * @param cbCardCount
- *  牌数量（应为 3n+2）
+ *  牌数量（应为 3n+2，含被抽出的财神牌）
  * @param WeaveItem
  *  已亮出的碰/杠/吃组合
  * @param cbItemCount
  *  组合数量
  * @param AnalyseItemArray
  *  分析结果
+ * @param jokers
+ *  手中财神牌（万能牌）数量
  */
-void GameLogic::analyseCardJoker(const uint8_t *cbCardIndex, const uint8_t cbCardCount, tagWeaveItem *WeaveItem, uint8_t cbItemCount, CAnalyseItemArray &AnalyseItemArray) {
+void GameLogic::analyseCardJoker(const uint8_t *cbCardIndex, const uint8_t cbCardCount, tagWeaveItem *WeaveItem, uint8_t cbItemCount, CAnalyseItemArray &AnalyseItemArray, const uint8_t jokers) {
     const size_t kMaxResult = 64;   //拆分方式上限，避免组合爆炸
     uint8_t counts[MAX_INDEX];
     memcpy(counts, cbCardIndex, sizeof(counts));
-    uint8_t jokers = counts[JOKER_INDEX];   //白板即万能财神
-    counts[JOKER_INDEX] = 0;
     uint8_t sets = static_cast<uint8_t>((cbCardCount - 2) / 3);   //需要的面子数
 
     struct MJMeld { uint8_t kind; uint8_t centerCard; };
@@ -594,7 +637,7 @@ void GameLogic::analyseCardJoker(const uint8_t *cbCardIndex, const uint8_t cbCar
         uint8_t i = firstNonZero();
         if (i == 0xFF) {                //只剩财神：三张财神可作任意刻子
             if (curJokers == 3u * curSets) {
-                for (uint8_t s = 0; s < curSets; s++) melds.push_back({WIK_P, JOKER_CARD});
+                for (uint8_t s = 0; s < curSets; s++) melds.push_back({WIK_P, s_JokerCard});
                 uint8_t savedSets = curSets, savedJokers = curJokers;
                 curSets = 0; curJokers = 0;
                 if (allZero()) pushItem();
@@ -630,7 +673,7 @@ void GameLogic::analyseCardJoker(const uint8_t *cbCardIndex, const uint8_t cbCar
     };
 
     //枚举将牌：真实对子 / 真实牌+财神 / 财神+财神
-    for (uint8_t i = 0; i < JOKER_INDEX; i++) {
+    for (uint8_t i = 0; i < MAX_INDEX; i++) {
         if (counts[i] >= 2) {
             counts[i] -= 2; eye = switchToCardData(i);
             curJokers = jokers;
@@ -638,27 +681,27 @@ void GameLogic::analyseCardJoker(const uint8_t *cbCardIndex, const uint8_t cbCar
             counts[i] += 2;
         }
     }
-    for (uint8_t i = 0; i < JOKER_INDEX; i++) {
+    for (uint8_t i = 0; i < MAX_INDEX; i++) {
         if (counts[i] >= 1 && jokers >= 1) {
-            counts[i] -= 1; eye = JOKER_CARD;   //财神参与作将 -> 爆头
+            counts[i] -= 1; eye = s_JokerCard;   //财神参与作将 -> 爆头
             curJokers = static_cast<uint8_t>(jokers - 1);
             tryPair();
             counts[i] += 1;
         }
     }
     if (jokers >= 2) {
-        eye = JOKER_CARD;
+        eye = s_JokerCard;
         curJokers = static_cast<uint8_t>(jokers - 2);
         tryPair();
     }
 }
 
-bool GameLogic::analyseCard(const uint8_t *cbCardIndex, const uint8_t cbCardCount, tagWeaveItem *WeaveItem, uint8_t cbItemCount, CAnalyseItemArray &AnalyseItemArray) {
+bool GameLogic::analyseCard(const uint8_t *cbCardIndex, const uint8_t cbCardCount, tagWeaveItem *WeaveItem, uint8_t cbItemCount, CAnalyseItemArray &AnalyseItemArray, const uint8_t jokers) {
     //效验数目
     if ((cbCardCount < 2) || (cbCardCount > MAX_COUNT) || ((cbCardCount - 2) % 3 != 0)) return false;
-    //萧山麻将：手中含财神（白板）时，走万能牌拆分逻辑
-    if (cbCardIndex[JOKER_INDEX] > 0) {
-        analyseCardJoker(cbCardIndex, cbCardCount, WeaveItem, cbItemCount, AnalyseItemArray);
+    //萧山麻将：手中含财神牌（万能牌）时，走万能牌拆分逻辑
+    if (jokers > 0) {
+        analyseCardJoker(cbCardIndex, cbCardCount, WeaveItem, cbItemCount, AnalyseItemArray, jokers);
         return (AnalyseItemArray.size() > 0);
     }
     //变量定义
@@ -831,12 +874,19 @@ bool GameLogic::analyseCanHuCard(const uint8_t *cbCardIndex, tagWeaveItem *Weave
     //计算数目
     uint8_t cbCardCountTemp = getCardCount(cbCardIndexTemp);
     uint8_t cbCardCount = static_cast<uint8_t>(cbCardCountTemp - 1);
+    //萧山麻将：归一化（财神牌抽出为万能牌，白板并入财神索引作为普通牌）
+    uint8_t jokers = cbCardIndexTemp[s_JokerIndex];
+    cbCardIndexTemp[s_JokerIndex] = 0;
+    if (s_JokerIndex != WHITE_INDEX) {
+        cbCardIndexTemp[s_JokerIndex] += cbCardIndexTemp[WHITE_INDEX];
+        cbCardIndexTemp[WHITE_INDEX] = 0;
+    }
     //分析扑克
     CAnalyseItemArray AnalyseItemArray;
     AnalyseItemArray.clear();
-    analyseCard(cbCardIndexTemp, cbCardCountTemp, WeaveItem, cbWeaveCount, AnalyseItemArray);
+    analyseCard(cbCardIndexTemp, cbCardCountTemp, WeaveItem, cbWeaveCount, AnalyseItemArray, jokers);
     //是否能胡牌
-    return canHu(cbCardIndexTemp, cbCardCountTemp, cbCardIndex, cbCardCount, WeaveItem, cbWeaveCount, AnalyseItemArray);
+    return canHu(cbCardIndexTemp, cbCardCountTemp, cbCardIndex, cbCardCount, WeaveItem, cbWeaveCount, AnalyseItemArray, jokers);
 }
 
 /**
@@ -871,9 +921,8 @@ bool GameLogic::analyseTingCardResult(const uint8_t *cbCardIndex, tagWeaveItem *
  * @param AnalyseItemArray
  * @return
  */
-bool GameLogic::canHu(const uint8_t cbCardIndexTemp[MAX_INDEX], const uint8_t cbCardCountTemp, const uint8_t cbCardIndex[MAX_INDEX], const uint8_t cbCardCount, tagWeaveItem WeaveItem[], uint8_t cbWeaveCount, CAnalyseItemArray &AnalyseItemArray) {
+bool GameLogic::canHu(const uint8_t cbCardIndexTemp[MAX_INDEX], const uint8_t cbCardCountTemp, const uint8_t cbCardIndex[MAX_INDEX], const uint8_t cbCardCount, tagWeaveItem WeaveItem[], uint8_t cbWeaveCount, CAnalyseItemArray &AnalyseItemArray, const uint8_t jokers) {
     if (cbWeaveCount == 0) {    //计算七对，	//不存在碰、杠
-        uint8_t jokers = cbCardIndexTemp[JOKER_INDEX];
         if (jokers == 0) {
             uint8_t cbDuiCount = 0;
             for (uint8_t i = 0; i < MAX_INDEX; i++) {
@@ -888,7 +937,7 @@ bool GameLogic::canHu(const uint8_t cbCardIndexTemp[MAX_INDEX], const uint8_t cb
         } else if (cbCardCountTemp == 14) {
             //含财神的七对：财神补齐所有单张，剩余财神两两成对
             uint8_t cbOddCount = 0;
-            for (uint8_t i = 0; i < JOKER_INDEX; i++) {
+            for (uint8_t i = 0; i < MAX_INDEX; i++) {
                 if ((cbCardIndexTemp[i] & 1) != 0) cbOddCount++;
             }
             if (cbOddCount <= jokers && ((jokers - cbOddCount) % 2 == 0)) {
@@ -940,10 +989,10 @@ uint64_t GameLogic::pingHu(const uint8_t *cbCardIndexTemp, const uint8_t cbCardC
  * @param AnalyseItemArray
  * @return
  */
-uint64_t GameLogic::qingSe(const uint8_t *cbCardIndexTemp, const uint8_t cbCardCountTemp, const uint8_t *cbCardIndex, const uint8_t cbCardCount, tagWeaveItem *WeaveItem, uint8_t cbWeaveCount, CAnalyseItemArray &AnalyseItemArray) {
+uint64_t GameLogic::qingSe(const uint8_t *cbCardIndexTemp, const uint8_t cbCardCountTemp, const uint8_t *cbCardIndex, const uint8_t cbCardCount, tagWeaveItem *WeaveItem, uint8_t cbWeaveCount, CAnalyseItemArray &AnalyseItemArray, const uint8_t jokers) {
     uint8_t cbCardColor = 0xFF;
-    //萧山麻将：白板为万能财神，可充当任意花色，故清一色判定时忽略财神
-    for (uint8_t i = 0; i < JOKER_INDEX; i++) {
+    //萧山麻将：归一化后自然财神牌已抽出（万能），白板已并入财神索引作为普通牌，故此处直接按花色判定
+    for (uint8_t i = 0; i < MAX_INDEX; i++) {
         if (cbCardIndexTemp[i] != 0) {
             uint8_t cbTempCardColor = static_cast<uint8_t>(switchToCardData(i) & MASK_COLOR);
 
@@ -961,7 +1010,7 @@ uint64_t GameLogic::qingSe(const uint8_t *cbCardIndexTemp, const uint8_t cbCardC
         if ((cbCenterCard & MASK_COLOR) != cbCardColor) return CHR_NULL;
     }
     //对号判定
-    if (canHu(cbCardIndexTemp, cbCardCountTemp, cbCardIndex, cbCardCount, WeaveItem, cbWeaveCount, AnalyseItemArray)) {
+    if (canHu(cbCardIndexTemp, cbCardCountTemp, cbCardIndex, cbCardCount, WeaveItem, cbWeaveCount, AnalyseItemArray, jokers)) {
         return CHR_QS;
     }
     return CHR_NULL;
@@ -978,7 +1027,7 @@ uint64_t GameLogic::qingSe(const uint8_t *cbCardIndexTemp, const uint8_t cbCardC
  * @param AnalyseItemArray
  * @return
  */
-uint64_t GameLogic::ziYiSe(const uint8_t *cbCardIndexTemp, const uint8_t cbCardCountTemp, const uint8_t *cbCardIndex, const uint8_t cbCardCount, tagWeaveItem *WeaveItem, uint8_t cbWeaveCount, CAnalyseItemArray &AnalyseItemArray) {
+uint64_t GameLogic::ziYiSe(const uint8_t *cbCardIndexTemp, const uint8_t cbCardCountTemp, const uint8_t *cbCardIndex, const uint8_t cbCardCount, tagWeaveItem *WeaveItem, uint8_t cbWeaveCount, CAnalyseItemArray &AnalyseItemArray, const uint8_t jokers) {
     //手上牌必须全为字牌（花色 0x3）
     for (uint8_t i = 0; i < MAX_INDEX; i++) {
         if (cbCardIndexTemp[i] != 0) {
@@ -990,7 +1039,7 @@ uint64_t GameLogic::ziYiSe(const uint8_t *cbCardIndexTemp, const uint8_t cbCardC
         if ((WeaveItem[i].cbCenterCard & MASK_COLOR) != 0x30) return CHR_NULL;
     }
     //对号判定
-    if (canHu(cbCardIndexTemp, cbCardCountTemp, cbCardIndex, cbCardCount, WeaveItem, cbWeaveCount, AnalyseItemArray)) {
+    if (canHu(cbCardIndexTemp, cbCardCountTemp, cbCardIndex, cbCardCount, WeaveItem, cbWeaveCount, AnalyseItemArray, jokers)) {
         return CHR_ZY;
     }
     return CHR_NULL;
