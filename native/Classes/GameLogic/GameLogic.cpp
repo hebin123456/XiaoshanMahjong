@@ -828,15 +828,27 @@ bool GameLogic::analyseTingCardResult(const uint8_t *cbCardIndex, tagWeaveItem *
  */
 bool GameLogic::canHu(const uint8_t cbCardIndexTemp[MAX_INDEX], const uint8_t cbCardCountTemp, const uint8_t cbCardIndex[MAX_INDEX], const uint8_t cbCardCount, tagWeaveItem WeaveItem[], uint8_t cbWeaveCount, CAnalyseItemArray &AnalyseItemArray) {
     if (cbWeaveCount == 0) {    //计算七对，	//不存在碰、杠
-        uint8_t cbDuiCount = 0;
-        for (uint8_t i = 0; i < MAX_INDEX; i++) {
-            if (cbCardIndexTemp[i] == 2) //牌的数量存在奇数就是不是七对，否则是
-            {
-                cbDuiCount++;
+        uint8_t jokers = cbCardIndexTemp[JOKER_INDEX];
+        if (jokers == 0) {
+            uint8_t cbDuiCount = 0;
+            for (uint8_t i = 0; i < MAX_INDEX; i++) {
+                if (cbCardIndexTemp[i] == 2) //牌的数量存在奇数就是不是七对，否则是
+                {
+                    cbDuiCount++;
+                }
             }
-        }
-        if (cbDuiCount == 7) {
-            return true;
+            if (cbDuiCount == 7) {
+                return true;
+            }
+        } else if (cbCardCountTemp == 14) {
+            //含财神的七对：财神补齐所有单张，剩余财神两两成对
+            uint8_t cbOddCount = 0;
+            for (uint8_t i = 0; i < JOKER_INDEX; i++) {
+                if ((cbCardIndexTemp[i] & 1) != 0) cbOddCount++;
+            }
+            if (cbOddCount <= jokers && ((jokers - cbOddCount) % 2 == 0)) {
+                return true;
+            }
         }
     }
     return AnalyseItemArray.size() > 0;

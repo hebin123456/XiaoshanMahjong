@@ -270,19 +270,22 @@ bool GameEngine::estimateUserRespond(uint8_t cbCurrentUser, uint8_t cbCurrentCar
         if (cbCurrentUser == i) continue;                       //过滤当前出牌的玩家，即自己不能胡自己的牌
         if (estimateKind == EstimateKind_OutCard)               //出牌方式为普通出牌
         {
-            if (!m_cbPassPeng[i][GameLogic::switchToCardIndex(cbCurrentCard)])            //检测可以碰牌、没碰上家的牌不能碰对家和下家的
-            {
-                m_cbUserAction[i] |= GameLogic::estimatePengCard(m_cbCardIndex[i], cbCurrentCard);    //碰牌判断
-                if ((m_cbUserAction[i] && WIK_P) != 0) {
-                    m_cbPassPeng[i][GameLogic::switchToCardIndex(cbCurrentCard)] = true;
+            //萧山麻将：白板为万能财神，打出后其余三家不能吃/碰/杠（但可以胡）
+            if (cbCurrentCard != JOKER_CARD) {
+                if (!m_cbPassPeng[i][GameLogic::switchToCardIndex(cbCurrentCard)])            //检测可以碰牌、没碰上家的牌不能碰对家和下家的
+                {
+                    m_cbUserAction[i] |= GameLogic::estimatePengCard(m_cbCardIndex[i], cbCurrentCard);    //碰牌判断
+                    if ((m_cbUserAction[i] && WIK_P) != 0) {
+                        m_cbPassPeng[i][GameLogic::switchToCardIndex(cbCurrentCard)] = true;
+                    }
                 }
-            }
-            if (m_cbLeftCardCount > 0)                                                                  //有剩余的牌才能杠
-            {
-                m_cbUserAction[i] |= GameLogic::estimateGangCard(m_cbCardIndex[i], cbCurrentCard);    //杠牌判断，明杠
-                if ((m_cbUserAction[i] & WIK_G) != 0x00) {                                              //有杠
-                    m_cbGangCount = 1;
-                    m_cbGangCard[0] = cbCurrentCard;
+                if (m_cbLeftCardCount > 0)                                                                  //有剩余的牌才能杠
+                {
+                    m_cbUserAction[i] |= GameLogic::estimateGangCard(m_cbCardIndex[i], cbCurrentCard);    //杠牌判断，明杠
+                    if ((m_cbUserAction[i] & WIK_G) != 0x00) {                                              //有杠
+                        m_cbGangCount = 1;
+                        m_cbGangCard[0] = cbCurrentCard;
+                    }
                 }
             }
         }
