@@ -26,6 +26,7 @@ public:
         m_Android = android;
         m_Sex = sex;
         m_pGameEngineEventListener = pGameEngineEventListener;
+        m_ChairID = INVALID_CHAIR;  //椅子编号未分配前为无效值，避免未初始化
     };  //构造函数
     virtual ~IPlayer() {
 

@@ -137,9 +137,13 @@ bool GameLayer::onGameStartEvent(CMD_S_GameStart GameStart) {
     showCardWall(GameStart.cbBankerUser, GameStart.cbDice1, GameStart.cbDice2);    //绘制四边牌墙（按骰子留出起牌缺口）
     showBankerStreakBadge();    //庄家头像角标：庄 / N连庄
     //萧山麻将掷骰：首局每人掷骰定庄（AI自动，真人按钮）；非首局庄家掷骰定起牌位置
+    uint8_t cbBankerView = m_GameEngine->switchViewChairID(GameStart.cbBankerUser, m_MeChairID);
+    cocos2d::log("掷骰分支：首局=%d 庄家椅子%d 庄家视图%d 我椅子%d",
+                 GameStart.bFirstGame ? 1 : 0, GameStart.cbBankerUser, cbBankerView, m_MeChairID);
     if (GameStart.bFirstGame) {
         showBankerDiceFlow(GameStart);
-    } else if (m_GameEngine->switchViewChairID(GameStart.cbBankerUser, m_MeChairID) == 0) {
+    } else if (cbBankerView == 0 || GameStart.cbBankerUser == m_MeChairID) {
+        cocos2d::log("玩家坐庄：显示掷骰子按钮等待点击");
         showDiceRollButton(GameStart);
     } else {
         this->scheduleOnce([this, GameStart](float) {
@@ -912,7 +916,12 @@ void GameLayer::playBankerDiceStep(CMD_S_GameStart GameStart) {
         return;
     }
     uint8_t cbChair = static_cast<uint8_t>(m_iBankerDiceStep);
-    if (cbChair == m_MeChairID) {
+    //真人判定：视图0（自己）为准，椅子相等兜底——避免 m_MeChairID 时序异常导致误判成AI自动掷
+    uint8_t cbChairView = m_GameEngine->switchViewChairID(cbChair, m_MeChairID);
+    bool bMeTurn = (cbChairView == 0 || cbChair == m_MeChairID);
+    cocos2d::log("定庄掷骰：第%d家 椅子%d 视图%d 我椅子%d 是否轮到我=%d",
+                 m_iBankerDiceStep, cbChair, cbChairView, m_MeChairID, bMeTurn ? 1 : 0);
+    if (bMeTurn) {
         //真人掷骰：显示按钮
         Node *pOld = m_rootNode->getChildByName("DiceRollBtn");
         if (pOld) { pOld->removeFromParent(); }
