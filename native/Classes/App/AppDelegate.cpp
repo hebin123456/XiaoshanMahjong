@@ -25,6 +25,7 @@
 #include "AppDelegate.h"
 #include "GameConfig.h"
 #include "LoadingScene.h"
+#include <utility>
 
 // #define USE_AUDIO_ENGINE 1
 // #define USE_SIMPLE_AUDIO_ENGINE 1
@@ -81,7 +82,9 @@ bool AppDelegate::applicationDidFinishLaunching() {
     // set FPS. the default value is 1.0/60 if you don't call this
     director->setAnimationInterval(1.0f / 40.0f);
     // Set the design resolution
-    glview->setDesignResolutionSize(designResolutionSize.width, designResolutionSize.height, ResolutionPolicy::SHOW_ALL);
+    //FIXED_HEIGHT：高度固定720、宽度随屏幕比例延展（折叠屏展开/超宽屏不留黑边）；
+    //界面内容在 IDialog::fitRootNode() 中等比缩放居中，窗口尺寸变化时自动重排
+    glview->setDesignResolutionSize(designResolutionSize.width, designResolutionSize.height, ResolutionPolicy::FIXED_HEIGHT);
     //添加资源搜索路径
     std::vector<std::string> searchPath;
     searchPath.push_back("res");
@@ -112,4 +115,22 @@ void AppDelegate::applicationWillEnterForeground() {
     SimpleAudioEngine::getInstance()->resumeBackgroundMusic();
     SimpleAudioEngine::getInstance()->resumeAllEffects();
 #endif
+}
+
+// Android surface 尺寸变化（折叠屏展开/折叠、分屏拖拽）
+void AppDelegate::applicationScreenSizeChanged(int newWidth, int newHeight) {
+    auto director = Director::getInstance();
+    auto glview = director->getOpenGLView();
+    if (glview == nullptr || newWidth <= 0 || newHeight <= 0) {
+        return;
+    }
+    //横屏：保证宽>高（个别设备折叠瞬间会传竖直值）
+    float w = newWidth, h = newHeight;
+    if (w < h) {
+        std::swap(w, h);
+    }
+    glview->setFrameSize(w, h);                        //内部按当前策略重算设计分辨率与视口
+    glview->setDesignResolutionSize(designResolutionSize.width, designResolutionSize.height,
+                                    ResolutionPolicy::FIXED_HEIGHT);
+    //winSize 已更新，各界面 IDialog 的 FitScreen 定时会检测到变化并重新布局
 }

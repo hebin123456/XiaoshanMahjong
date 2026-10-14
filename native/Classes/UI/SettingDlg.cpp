@@ -22,9 +22,13 @@ SettingDlg::~SettingDlg(){
 }
 
 void SettingDlg::onUILoaded() {
-    m_rootNode->setScale(0.5f);
-    m_rootNode->runAction(EaseElasticOut::create(ScaleTo::create(0.5f, 1.0f, 1.0f))); //动画
-    m_rootNode->addChild(LayerColor::create(Color4B(0, 0, 0, 200)), -1);
+    //折叠屏适配：弹出动画按适配比例缩放；半透明罩铺满全屏
+    LayerColor *pMask = LayerColor::create(Color4B(0, 0, 0, 200));
+    this->addChild(pMask, 0);
+    pMask->setContentSize(Director::getInstance()->getVisibleSize());
+    pMask->setPosition(Director::getInstance()->getVisibleOrigin());
+    m_rootNode->setScale(m_fFitScale * 0.5f);
+    m_rootNode->runAction(EaseElasticOut::create(ScaleTo::create(0.5f, m_fFitScale, m_fFitScale))); //动画
     m_btnClose->addClickEventListener([this](Ref* sender){
         GameConfig::getInstance()->saveConfig();    //关闭前保存配置
         DialogManager::shared()->closeCurrentDialog();

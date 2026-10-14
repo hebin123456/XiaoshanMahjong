@@ -58,6 +58,12 @@ public:
     @param  the pointer of the application
     */
     virtual void applicationWillEnterForeground();
+
+    /**
+    @brief  Android surface 尺寸变化（折叠屏展开/折叠、分屏拖拽）时回调，
+            3.17 默认不更新设计分辨率，这里显式重设以驱动界面重新适配
+    */
+    virtual void applicationScreenSizeChanged(int newWidth, int newHeight);
 };
 
 #endif // _APP_DELEGATE_H_
