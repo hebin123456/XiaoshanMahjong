@@ -2,6 +2,8 @@
 // Created by farmer on 2018/7/4.
 //
 
+#include <memory>
+
 #include "GameLayer.h"
 #include "AIPlayer.h"
 #include "RealPlayer.h"
@@ -29,7 +31,9 @@ GameLayer::GameLayer()  : IDialog() {
     m_bMove = false;
     m_pOperateNotifyGroup = NULL;
     m_pTextCardNum = NULL;
-    m_pCardPile = NULL;
+    m_pCardWall = NULL;
+    m_iWallFirstSlot = -1;
+    m_bDiceConfirmed = false;
     m_pOutCard = NULL;
     m_iOutCardTimeOut = USER_OP_MAX_TIME;
     m_MeChairID = 0;
@@ -58,6 +62,15 @@ void GameLayer::onUILoaded() {
         // 游戏设置按钮
         DialogManager::shared()->showDialog(SettingDlg::create());
     });
+    //弃牌区位置微调（为桌面四边牌墙让位）
+    Node *pDiscardCard0 = this->getChildByName("DiscardCard_0");
+    if (pDiscardCard0) {
+        pDiscardCard0->setPosition(Vec2(430.0f, 182.0f));
+    }
+    Node *pDiscardCard2 = this->getChildByName("DiscardCard_2");
+    if (pDiscardCard2) {
+        pDiscardCard2->setPosition(Vec2(430.0f, 448.0f));
+    }
     // 玩家加入游戏
     RealPlayer *pIPlayer = new RealPlayer(IPlayer::MALE, this);
     m_GameEngine->onUserEnter(pIPlayer);
@@ -77,6 +90,8 @@ void GameLayer::onUILoaded() {
 void GameLayer::initGame() {
     m_cbLeftCardCount = 0;
     m_cbBankerChair = INVALID_CHAIR;
+    m_iWallFirstSlot = -1;
+    m_bDiceConfirmed = false;
     memset(&m_cbWeaveItemCount, 0, sizeof(m_cbWeaveItemCount));
     memset(&m_cbDiscardCount, 0, sizeof(m_cbDiscardCount));
     for (uint8_t i = 0; i < GAME_PLAYER; i++) {
@@ -104,6 +119,7 @@ bool GameLayer::onUserEnterEvent(IPlayer *pIPlayer) {
 bool GameLayer::onGameStartEvent(CMD_S_GameStart GameStart) {
     cocos2d::log("接收到游戏开始事件");   //接收到游戏开始事件
     initGame();
+    removeDiceNodes();    //清理上一局遗留的骰子/掷骰按钮
     //调整头像位置
     m_FaceFrame[0]->runAction(MoveTo::create(0.50f, Vec2(0080.00f, 250.00f)));
     m_FaceFrame[1]->runAction(MoveTo::create(0.50f, Vec2(0080.00f, 380.00f)));
@@ -112,15 +128,20 @@ bool GameLayer::onGameStartEvent(CMD_S_GameStart GameStart) {
     //剩余的牌
     m_cbLeftCardCount = GameStart.cbLeftCardCount;
     m_cbBankerChair = GameStart.cbBankerUser;
-    cocos2d::log("本局财神（发牌后翻出的那张牌）：%02x", GameStart.cbJokerCard);
+    cocos2d::log("本局财神（发牌后翻出的那张牌）：%02x，骰子：%d+%d", GameStart.cbJokerCard, GameStart.cbDice1, GameStart.cbDice2);
     GameLogic::switchToCardIndex(GameStart.cbCardData, MAX_COUNT - 1, m_cbCardIndex[m_MeChairID]);
     //界面显示
     m_pTextCardNum->setString(utility::toString((int) m_cbLeftCardCount));
     showAndUpdateUserScore(m_GameEngine->getGameScoreTable());   //刷新总局积分显示
-    showCardPile(m_cbLeftCardCount);                //绘制桌面牌堆（剩余牌墙）
-    showJokerCard(GameStart.cbJokerCard);           //把翻出的财神牌正面朝上放在牌堆旁边
-    showAndUpdateHandCard();
-    showAndUpdateDiscardCard();
+    showCardWall(GameStart.cbBankerUser, GameStart.cbDice1, GameStart.cbDice2);    //绘制四边牌墙（按骰子留出起牌缺口）
+    //萧山麻将：庄家掷两颗骰子定起牌位置——人是庄家点「掷骰子」按钮，AI庄家自动掷；掷完才亮手牌、翻财神、发第一张
+    if (m_GameEngine->switchViewChairID(GameStart.cbBankerUser, m_MeChairID) == 0) {
+        showDiceRollButton(GameStart);
+    } else {
+        this->scheduleOnce([this, GameStart](float) {
+            playDiceAnimation(GameStart);
+        }, 0.5f, "AiAutoDice");
+    }
     return true;
 }
 
@@ -132,7 +153,7 @@ bool GameLayer::onGameStartEvent(CMD_S_GameStart GameStart) {
 bool GameLayer::onSendCardEvent(CMD_S_SendCard SendCard) {
     m_iOutCardTimeOut = USER_OP_MAX_TIME; //重置计时器
     m_cbLeftCardCount--;
-    popCardPileOne();                    //摸一张牌，桌面牌堆少一张
+    popCardWallOne();                    //摸一张牌，牌墙起牌口少一张
     if (SendCard.cbCurrentUser == m_MeChairID) {
         m_cbCardIndex[m_MeChairID][GameLogic::switchToCardIndex(SendCard.cbCardData)]++;
     }
@@ -192,7 +213,7 @@ bool GameLayer::onOutCardEvent(CMD_S_OutCard OutCard) {
                 }
                 pDiscardCard0->addChild(pCard0);
             }
-            pDiscardCard0->setScale(0.7f, 0.7f);
+            pDiscardCard0->setScale(0.45f, 0.45f);
             //听牌判断
             uint8_t cbWeaveItemCount = m_cbWeaveItemCount[OutCard.cbOutCardUser];
             tagWeaveItem *pTagWeaveItem = m_WeaveItemArray[OutCard.cbOutCardUser];
@@ -252,7 +273,7 @@ bool GameLayer::onOutCardEvent(CMD_S_OutCard OutCard) {
                 }
                 pDiscardCard2->addChild(pCard2);
             }
-            pDiscardCard2->setScale(0.7f, 0.7f);
+            pDiscardCard2->setScale(0.45f, 0.45f);
 
             break;
         }
@@ -453,16 +474,17 @@ bool GameLayer::onGameEndEvent(CMD_S_GameEnd& GameEnd) {
     Node *pTingNode = UIHelper::seekNodeByName(m_PlayerPanel[0], "ting_0");    //隐藏听牌
     pTingNode->setVisible(false);
     this->removeEffectNode("EffectNode");
-    //清除桌面牌堆与翻出的财神牌
-    Node *pPile = m_rootNode->getChildByName("CardPile");
-    if (pPile) {
-        pPile->removeFromParent();
+    //清除桌面牌墙、翻出的财神牌与骰子
+    Node *pWall = m_rootNode->getChildByName("CardWall");
+    if (pWall) {
+        pWall->removeFromParent();
     }
-    m_pCardPile = NULL;
+    m_pCardWall = NULL;
     Node *pJoker = m_rootNode->getChildByName("JokerCard");
     if (pJoker) {
         pJoker->removeFromParent();
     }
+    removeDiceNodes();
     this->m_pOperateNotifyGroup->removeAllChildren();
     this->m_pOperateNotifyGroup->setVisible(false);
     //显示结算界面
@@ -547,54 +569,102 @@ bool GameLayer::showSendCard(CMD_S_SendCard SendCard) {
 }
 
 /**
- * 绘制桌面牌堆（剩余牌墙）
- * 剩余几张牌就叠几张牌背，沿竖直方向轻微错开，形成看得见厚度的牌堆
- * @param cbCount 剩余牌数量
+ * 牌墙槽位坐标（俯视图）
+ * 四边各17墩：下(视角0)→左(视角1)→上(视角2)→右(视角3)按环序排列；
+ * 每墩2张，墩顶那张向桌心方向错开一点，显出厚度
+ * @param iSlot 环上槽位（0-135）
+ * @return 槽位坐标
  */
-void GameLayer::showCardPile(uint8_t cbCount) {
-    Node *pOld = m_rootNode->getChildByName("CardPile");
+Vec2 GameLayer::wallSlotPos(int iSlot) {
+    int iSide = iSlot / 34;     //边（视角）
+    int iTile = iSlot % 34;     //边内序号
+    int iStack = iTile / 2;     //墩序号（沿环行进方向）
+    Vec2 pos;
+    switch (iSide) {
+        case 0: pos = Vec2(830.0f - 24.0f * iStack, 152.0f); break;         //下边：右→左
+        case 1: pos = Vec2(406.0f, 172.0f + 23.5f * iStack); break;         //左边：下→上
+        case 2: pos = Vec2(446.0f + 24.0f * iStack, 582.0f); break;         //上边：左→右
+        case 3: default: pos = Vec2(874.0f, 548.0f - 23.5f * iStack); break;//右边：上→下
+    }
+    if (iTile % 2 == 1) {   //墩顶的牌向桌心错开2.5px，显出两层
+        switch (iSide) {
+            case 0: pos.y += 2.5f; break;
+            case 1: pos.x += 2.5f; break;
+            case 2: pos.y -= 2.5f; break;
+            case 3: default: pos.x -= 2.5f; break;
+        }
+    }
+    return pos;
+}
+
+/**
+ * 绘制桌面四边牌墙（俯视图，每家面前17墩）
+ * 萧山麻将起牌规则：庄家掷两颗骰子，
+ *   点数和 5/9 对本家(庄家)、2/6/10 对下家、3/7/11 对对家、4/8/12 对上家的牌墙；
+ *   再从该牌墙尾部数「点数和」墩，从那一墩开始拿牌。
+ * 发牌(13*4张)与翻财神(1张)已消耗的槽位不画，形成起牌缺口
+ */
+void GameLayer::showCardWall(uint8_t cbBankerChair, uint8_t cbDice1, uint8_t cbDice2) {
+    Node *pOld = m_rootNode->getChildByName("CardWall");
     if (pOld) {
         pOld->removeFromParent();
     }
-    m_pCardPile = Node::create();
-    m_pCardPile->setName("CardPile");
-    m_rootNode->addChild(m_pCardPile, 5);   //牌堆压在最底层之上
-    const float kPileX = 520.0f;      //牌堆中心 X（桌面中央左侧，避开中央倒计时轮盘）
-    const float kPileBaseY = 180.0f;  //牌堆底部 Y
-    const float kLayerOffset = 3.00f; //每张牌露出高度
-    uint8_t cbLayer = cbCount;
-    if (cbLayer > 90) {               //防止极端情况下叠层过多
-        cbLayer = 90;
+    m_pCardWall = Node::create();
+    m_pCardWall->setName("CardWall");
+    m_rootNode->addChild(m_pCardWall, 5);
+    //骰子点数和定方位（相对庄家）
+    uint8_t cbSum = static_cast<uint8_t>(cbDice1 + cbDice2);
+    uint8_t cbSideChair = cbBankerChair;    //默认本家（5/9）
+    switch (cbSum) {
+        case 2: case 6: case 10: cbSideChair = static_cast<uint8_t>((cbBankerChair + 1) % GAME_PLAYER); break;  //下家
+        case 3: case 7: case 11: cbSideChair = static_cast<uint8_t>((cbBankerChair + 2) % GAME_PLAYER); break;  //对家
+        case 4: case 8: case 12: cbSideChair = static_cast<uint8_t>((cbBankerChair + 3) % GAME_PLAYER); break;  //上家
+        default: break;
     }
-    for (uint8_t i = 0; i < cbLayer; i++) {
+    uint8_t cbSideView = m_GameEngine->switchViewChairID(cbSideChair, m_MeChairID);
+    //起牌槽位：该墙从尾部数第 cbSum 墩开始拿（先拿墩顶那张）
+    m_iWallFirstSlot = cbSideView * 34 + (17 - cbSum) * 2 + 1;
+    //已消耗的槽位数（含发牌与翻财神）
+    int iConsumed = MAX_REPERTORY - m_cbLeftCardCount;
+    for (int p = 0; p < MAX_REPERTORY; p++) {
+        int iDist = (m_iWallFirstSlot - p + MAX_REPERTORY) % MAX_REPERTORY;
+        if (iDist < iConsumed) {
+            continue;   //已被拿走的槽位不画
+        }
+        int iSide = p / 34;
         ui::ImageView *pBack = ui::ImageView::create(UIHelper::getBackCardImagePath(0, 0));
-        pBack->setAnchorPoint(Vec2(0.5f, 0.0f));
-        pBack->setPosition(Vec2(kPileX, kPileBaseY + i * kLayerOffset));
-        m_pCardPile->addChild(pBack);
+        pBack->setScale(0.28f);                     //牌背缩成俯视小牌 21x33
+        if (iSide == 1 || iSide == 3) {
+            pBack->setRotation(90.0f);              //左右两边横放
+        }
+        pBack->setPosition(wallSlotPos(p));
+        pBack->setName(utility::toString("slot_", p));
+        m_pCardWall->addChild(pBack);
     }
 }
 
 /**
- * 摸一张牌，牌堆最上面那张飞走，实现「摸一下少一张」的效果
+ * 摸一张牌，牌墙起牌口少一张（最靠缺口的那张飞走）
  */
-void GameLayer::popCardPileOne() {
-    if (m_pCardPile == NULL) {
+void GameLayer::popCardWallOne() {
+    if (m_pCardWall == NULL || m_iWallFirstSlot < 0) {
         return;
     }
-    const auto &aChildren = m_pCardPile->getChildren();
-    if (aChildren.empty()) {
+    int iConsumed = MAX_REPERTORY - m_cbLeftCardCount;     //含刚摸的这张
+    int iSlot = ((m_iWallFirstSlot - (iConsumed - 1)) % MAX_REPERTORY + MAX_REPERTORY) % MAX_REPERTORY;
+    Node *pTile = m_pCardWall->getChildByName(utility::toString("slot_", iSlot));
+    if (pTile == NULL) {
         return;
     }
-    Node *pTop = aChildren.back();  //最后添加的是最上面那张
-    //向上抽出并淡出，视觉上从牌堆里被摸走
-    pTop->runAction(Sequence::create(
+    //向上抽出并淡出，视觉上从牌墙里被摸走
+    pTile->runAction(Sequence::create(
             Spawn::create(MoveBy::create(0.20f, Vec2(0.0f, 40.0f)), FadeOut::create(0.20f), nullptr),
             RemoveSelf::create(),
             nullptr));
 }
 
 /**
- * 显示翻出的财神牌：正面朝上放在牌堆旁边
+ * 财神牌翻出后正面朝上摆在牌墙旁边（起牌缺口结束处向桌心偏移）
  * @param cbCardData 翻出的那张财神牌
  */
 void GameLayer::showJokerCard(uint8_t cbCardData) {
@@ -602,22 +672,171 @@ void GameLayer::showJokerCard(uint8_t cbCardData) {
     if (pOld) {
         pOld->removeFromParent();
     }
-    if (cbCardData == 0) {
+    if (cbCardData == 0 || m_iWallFirstSlot < 0) {
         return;     //没有翻出财神
+    }
+    //翻财神那张牌的槽位 = 发完13*4张后的下一张
+    int iJokerSlot = ((m_iWallFirstSlot - 52) % MAX_REPERTORY + MAX_REPERTORY) % MAX_REPERTORY;
+    Vec2 pos = wallSlotPos(iJokerSlot);
+    switch (iJokerSlot / 34) {  //向桌心偏移，摆在牌墙内侧
+        case 0: pos += Vec2(0.0f, 44.0f); break;
+        case 1: pos += Vec2(44.0f, 0.0f); break;
+        case 2: pos += Vec2(0.0f, -44.0f); break;
+        case 3: default: pos += Vec2(-44.0f, 0.0f); break;
     }
     Node *pJoker = Node::create();
     pJoker->setName("JokerCard");
-    pJoker->setPosition(Vec2(436.0f, 360.0f));  //放在牌堆左边
+    pJoker->setPosition(pos);
     m_rootNode->addChild(pJoker, 6);
     //财神牌正面
     ui::ImageView *pCard = UIHelper::createDiscardCardImageView(0, cbCardData);
+    pCard->setScale(0.45f);
     pCard->setPosition(Vec2(0.0f, 0.0f));
     pJoker->addChild(pCard);
     //「财神」提示
-    ui::Text *pLabel = ui::Text::create("财神", "num.ttf", 22);
+    ui::Text *pLabel = ui::Text::create("财神", "res/DFYuanW7-GB2312.ttf", 16);
     pLabel->setTextColor(Color4B(255, 40, 40, 255));
-    pLabel->setPosition(Vec2(0.0f, -80.0f));
+    pLabel->setPosition(Vec2(0.0f, -38.0f));
     pJoker->addChild(pLabel);
+}
+
+/**
+ * 构建一颗骰子（白底方片+点数层）
+ */
+Node *GameLayer::buildDieNode() {
+    Node *pDie = Node::create();
+    DrawNode *pBg = DrawNode::create();
+    pBg->drawSolidRect(Vec2(-24.0f, -24.0f), Vec2(24.0f, 24.0f), Color4F(0.96f, 0.96f, 0.94f, 1.0f));
+    pBg->drawRect(Vec2(-24.0f, -24.0f), Vec2(24.0f, 24.0f), Color4F(0.45f, 0.45f, 0.45f, 1.0f));
+    pDie->addChild(pBg);
+    Node *pFace = Node::create();
+    pFace->setName("Face");
+    pDie->addChild(pFace);
+    return pDie;
+}
+
+/**
+ * 设置骰子点数（标准骰面布局）
+ */
+void GameLayer::setDieFace(Node *pDie, uint8_t cbValue) {
+    Node *pFace = pDie->getChildByName("Face");
+    if (pFace == NULL) {
+        return;
+    }
+    pFace->removeAllChildren();
+    if (cbValue < 1) cbValue = 1;
+    if (cbValue > 6) cbValue = 6;
+    DrawNode *pDots = DrawNode::create();
+    const float r = 4.5f;
+    const Color4F dot(0.13f, 0.13f, 0.13f, 1.0f);
+    const Vec2 c(0.0f, 0.0f), tl(-12.0f, 12.0f), br(12.0f, -12.0f), tr(12.0f, 12.0f), bl(-12.0f, -12.0f), ml(-12.0f, 0.0f), mr(12.0f, 0.0f);
+    switch (cbValue) {
+        case 1: pDots->drawDot(c, r + 1.5f, dot); break;
+        case 2: pDots->drawDot(tl, r, dot); pDots->drawDot(br, r, dot); break;
+        case 3: pDots->drawDot(tl, r, dot); pDots->drawDot(c, r, dot); pDots->drawDot(br, r, dot); break;
+        case 4: pDots->drawDot(tl, r, dot); pDots->drawDot(tr, r, dot); pDots->drawDot(bl, r, dot); pDots->drawDot(br, r, dot); break;
+        case 5: pDots->drawDot(tl, r, dot); pDots->drawDot(tr, r, dot); pDots->drawDot(c, r, dot); pDots->drawDot(bl, r, dot); pDots->drawDot(br, r, dot); break;
+        case 6: default: pDots->drawDot(tl, r, dot); pDots->drawDot(ml, r, dot); pDots->drawDot(bl, r, dot); pDots->drawDot(tr, r, dot); pDots->drawDot(mr, r, dot); pDots->drawDot(br, r, dot); break;
+    }
+    pFace->addChild(pDots);
+}
+
+/**
+ * 清理骰子相关节点与定时任务
+ */
+void GameLayer::removeDiceNodes() {
+    this->unschedule("DiceRollAnim");
+    this->unschedule("DiceAnimDone");
+    this->unschedule("AiAutoDice");
+    Node *pDice = m_rootNode->getChildByName("DiceGroup");
+    if (pDice) {
+        pDice->removeFromParent();
+    }
+    Node *pBtn = m_rootNode->getChildByName("DiceRollBtn");
+    if (pBtn) {
+        pBtn->removeFromParent();
+    }
+}
+
+/**
+ * 播放庄家掷骰动画：两颗骰子快速滚动后落定，随后开始发牌
+ */
+void GameLayer::playDiceAnimation(CMD_S_GameStart GameStart) {
+    removeDiceNodes();
+    Node *pGroup = Node::create();
+    pGroup->setName("DiceGroup");
+    pGroup->setPosition(Vec2(640.0f, 455.0f));  //牌桌中央（倒计时轮盘下方）
+    m_rootNode->addChild(pGroup, 20);
+    Node *pDie1 = buildDieNode();
+    pDie1->setPosition(Vec2(-34.0f, 0.0f));
+    pGroup->addChild(pDie1);
+    Node *pDie2 = buildDieNode();
+    pDie2->setPosition(Vec2(34.0f, 0.0f));
+    pGroup->addChild(pDie2);
+    //提示：点数和决定从哪家牌墙第几墩起牌
+    uint8_t cbSum = static_cast<uint8_t>(GameStart.cbDice1 + GameStart.cbDice2);
+    const char *strSide = "本家";
+    switch (cbSum) {
+        case 2: case 6: case 10: strSide = "下家"; break;
+        case 3: case 7: case 11: strSide = "对家"; break;
+        case 4: case 8: case 12: strSide = "上家"; break;
+        default: break;
+    }
+    ui::Text *pText = ui::Text::create(utility::toString((int) GameStart.cbDice1, "+", (int) GameStart.cbDice2,
+            " 从", strSide, "牌墙第", (int) cbSum, "墩起牌"), "res/DFYuanW7-GB2312.ttf", 18);
+    pText->setTextColor(Color4B(255, 235, 130, 255));
+    pText->setPosition(Vec2(0.0f, -46.0f));
+    pGroup->addChild(pText);
+    //滚动动画：快速变换点数后落定
+    auto pStep = std::make_shared<int>(0);
+    this->schedule([this, pGroup, pDie1, pDie2, GameStart, pStep](float) {
+        if (++(*pStep) >= 14) {
+            this->unschedule("DiceRollAnim");
+            setDieFace(pDie1, GameStart.cbDice1);
+            setDieFace(pDie2, GameStart.cbDice2);
+            pDie1->runAction(Sequence::create(ScaleTo::create(0.08f, 1.25f), ScaleTo::create(0.10f, 1.0f), nullptr));
+            pDie2->runAction(Sequence::create(ScaleTo::create(0.08f, 1.25f), ScaleTo::create(0.10f, 1.0f), nullptr));
+            this->scheduleOnce([this, pGroup, GameStart](float) {
+                pGroup->runAction(Sequence::create(FadeOut::create(0.30f), RemoveSelf::create(), nullptr));
+                finishGameStartUI(GameStart);   //骰子落定后开始发牌
+            }, 0.60f, "DiceAnimDone");
+        } else {
+            setDieFace(pDie1, static_cast<uint8_t>(rand() % 6 + 1));
+            setDieFace(pDie2, static_cast<uint8_t>(rand() % 6 + 1));
+        }
+    }, 0.07f, "DiceRollAnim");
+}
+
+/**
+ * 人是庄家：显示「掷骰子」按钮，点击后播放掷骰动画
+ */
+void GameLayer::showDiceRollButton(CMD_S_GameStart GameStart) {
+    removeDiceNodes();
+    ui::Button *pBtn = ui::Button::create("res/GameLayer/btn_action1.png");
+    pBtn->setName("DiceRollBtn");
+    pBtn->setTitleText("掷骰子");
+    pBtn->setTitleFontSize(26);
+    pBtn->setTitleFontName("res/DFYuanW7-GB2312.ttf");
+    pBtn->setScale(0.9f);
+    pBtn->setPosition(Vec2(640.0f, 475.0f));
+    pBtn->addClickEventListener([this, GameStart](Ref *) {
+        playDiceAnimation(GameStart);   //点击掷骰（动画开始时移除按钮）
+    });
+    m_rootNode->addChild(pBtn, 20);
+}
+
+/**
+ * 掷骰结束：亮手牌、翻财神、通知引擎发第一张牌
+ */
+void GameLayer::finishGameStartUI(CMD_S_GameStart GameStart) {
+    if (m_bDiceConfirmed) {
+        return;
+    }
+    m_bDiceConfirmed = true;
+    showAndUpdateHandCard();
+    showAndUpdateDiscardCard();
+    showJokerCard(GameStart.cbJokerCard);   //财神翻出摆在牌墙旁
+    m_GameEngine->onUserDiceConfirm();      //开始发牌（庄家摸第一张）
 }
 
 
@@ -1086,7 +1305,7 @@ bool GameLayer::showAndUpdateDiscardCard() {
                     x += 76;
                     pDiscardCard0->addChild(pCard0);
                 }
-                pDiscardCard0->setScale(0.7f, 0.7f);
+                pDiscardCard0->setScale(0.45f, 0.45f);
                 break;
             }
             case 1: {
@@ -1129,7 +1348,7 @@ bool GameLayer::showAndUpdateDiscardCard() {
                     x += 76;
                     pDiscardCard2->addChild(pCard2);
                 }
-                pDiscardCard2->setScale(0.7f, 0.7f);
+                pDiscardCard2->setScale(0.45f, 0.45f);
 
                 break;
             }

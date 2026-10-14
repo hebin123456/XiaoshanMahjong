@@ -40,6 +40,9 @@ void GameEngine::init() {
     m_cbSendCardCount = 0;
     m_cbSendCardData = 0;
     m_cbMa = 0;
+    m_cbDice1 = 0;                                  //骰子1点数
+    m_cbDice2 = 0;                                  //骰子2点数
+    m_bWaitDice = false;                            //掷骰确认状态
     memset(m_cbGangCard, 0, sizeof(m_cbGangCard));                                    //重置杠的牌
     memset(m_llHuRight, 0, sizeof(m_llHuRight));                                      //清空胡牌类型
     memset(m_cbHuKind, 0, sizeof(m_cbHuKind));                                        //清空胡牌方式
@@ -130,7 +133,10 @@ bool GameEngine::onGameStart() {
     GameLogic::setRuleFlags(ruleFlags);
 
     GameLogic::shuffle(m_cbRepertoryCard, sizeof(m_cbRepertoryCard));        //洗牌
-    iDiceCount = static_cast<uint32_t>(rand() % 6 + 1 + rand() % 6 + 1);    //骰子点数
+    //萧山麻将：庄家掷两颗骰子定起牌位置（点数和定方位与墩数）
+    m_cbDice1 = static_cast<uint8_t>(rand() % 6 + 1);                       //骰子1点数
+    m_cbDice2 = static_cast<uint8_t>(rand() % 6 + 1);                       //骰子2点数
+    iDiceCount = m_cbDice1 + m_cbDice2;                                     //两颗骰子点数和
     if (m_cbBankerUser == INVALID_CHAIR) {
         m_cbBankerUser = static_cast<uint8_t>(iDiceCount % GAME_PLAYER);        //确定庄家
     }
@@ -148,6 +154,8 @@ bool GameEngine::onGameStart() {
     //构造数据
     CMD_S_GameStart GameStart;
     GameStart.iDiceCount = iDiceCount;
+    GameStart.cbDice1 = m_cbDice1;                                     //骰子1点数
+    GameStart.cbDice2 = m_cbDice2;                                     //骰子2点数
     GameStart.cbBankerUser = m_cbBankerUser;
     GameStart.cbCurrentUser = m_cbCurrentUser;
     GameStart.cbLeftCardCount = m_cbLeftCardCount - m_cbMa;
@@ -167,6 +175,19 @@ bool GameEngine::onGameStart() {
             pListener->onGameStartEvent(GameStart);
         }
     }
+    //萧山麻将：庄家掷两颗骰子定起牌位置——先等掷骰确认（人是庄家点「掷骰子」按钮，AI庄家自动掷），再发第一张牌
+    m_bWaitDice = true;
+    return true;
+}
+
+/**
+ * 庄家掷骰确认（人是庄家点按钮/AI庄家自动），确认后发第一张牌
+ */
+bool GameEngine::onUserDiceConfirm() {
+    if (!m_bWaitDice) {
+        return false;
+    }
+    m_bWaitDice = false;
     dispatchCardData(m_cbCurrentUser);
     return true;
 }

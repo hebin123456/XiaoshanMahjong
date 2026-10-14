@@ -23,7 +23,9 @@ private:
     Node *m_pOperateNotifyGroup;        //操作组
     Node* m_pOutCard;                   //正在出牌的节点
     ui::Text *m_pTextCardNum;           //剩余牌数量
-    Node *m_pCardPile;                  //桌面牌堆（剩余牌墙）
+    Node *m_pCardWall;                  //桌面牌墙（四边各17墩的俯视牌堆）
+    int m_iWallFirstSlot;               //骰子定出的起牌槽位（第一张被拿走的牌在牌墙环上的位置）
+    bool m_bDiceConfirmed;              //本局骰子是否已确认（防止重复触发发牌）
     uint8_t m_MeChairID;                //自己的位置
     uint8_t m_iOutCardTimeOut;          //操作时间
 //游戏变量
@@ -74,10 +76,17 @@ private:
     bool showAndPlayOperateEffect(uint8_t cbViewID,uint8_t cbOperateCode, bool bZm);//播放特效
     bool showTingResult(const uint8_t cbCardIndex[MAX_INDEX], tagWeaveItem WeaveItem[], uint8_t cbWeaveCount);   //显示听牌的结果
     bool showAndUpdateUserScore(const int64_t lGameScoreTable[GAME_PLAYER]);             //更新分数
-    void showCardPile(uint8_t cbCount);                                             //绘制桌面牌堆（剩余牌墙）
-    void popCardPileOne();                                                          //摸牌后牌堆少一张
-    void showJokerCard(uint8_t cbCardData);                                         //显示翻出的财神牌（放在牌堆旁边）
-    
+    void showCardWall(uint8_t cbBankerChair, uint8_t cbDice1, uint8_t cbDice2);     //绘制四边牌墙（按骰子留出起牌缺口）
+    void popCardWallOne();                                                          //摸牌后牌墙起牌口少一张
+    void showJokerCard(uint8_t cbCardData);                                         //财神牌翻出后摆在牌墙旁边
+    Vec2 wallSlotPos(int iSlot);                                                    //牌墙槽位坐标（俯视图）
+    Node *buildDieNode();                                                           //构建一颗骰子
+    void setDieFace(Node *pDie, uint8_t cbValue);                                   //设置骰子点数
+    void removeDiceNodes();                                                         //清理骰子相关节点与定时任务
+    void playDiceAnimation(CMD_S_GameStart GameStart);                              //播放庄家掷骰动画
+    void showDiceRollButton(CMD_S_GameStart GameStart);                             //人是庄家时显示掷骰按钮
+    void finishGameStartUI(CMD_S_GameStart GameStart);                              //掷骰结束后：亮手牌、翻财神、开始发牌
+
 private:
     void removeEffectNode(std::string strNodeName); //移除特效
 };

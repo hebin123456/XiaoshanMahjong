@@ -90,7 +90,10 @@ public:
 private:
     IPlayer * m_pIPlayer[GAME_PLAYER];        //游戏玩家
     int64_t m_lGameScoreTable[GAME_PLAYER];           //记录总分
-    uint32_t iDiceCount;                              //骰子点数
+    uint32_t iDiceCount;                              //骰子点数（两颗之和）
+    uint8_t m_cbDice1;                                //骰子1点数（1-6）
+    uint8_t m_cbDice2;                                //骰子2点数（1-6）
+    bool m_bWaitDice;                                 //等待庄家掷骰确认（确认后才开始发牌）
     uint8_t m_CurrChair;                              //当前椅子数量
 
     uint8_t m_cbBankerUser;                           //庄家用户
@@ -142,6 +145,7 @@ public:
     void resetGameScore();                          //重置总局积分（开局每人50分）
     bool onGameStart();     //开始游戏
     bool onGameRestart();   //重新开始
+    bool onUserDiceConfirm();   //庄家掷骰确认（人点按钮/AI自动），之后开始发牌
     bool onUserOutCard(CMD_C_OutCard OutCard);   //出牌命令
     bool onEventGameConclude(uint8_t cbChairID); //结束游戏
     bool onUserEnter(IPlayer *pIPlayer);    //玩家进入

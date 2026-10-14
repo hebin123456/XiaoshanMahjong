@@ -31,7 +31,9 @@ struct CMD_WeaveItem {
 
 //游戏开始
 struct CMD_S_GameStart {
-    uint32_t iDiceCount;                         //骰子点数
+    uint32_t iDiceCount;                         //骰子点数（两颗之和）
+    uint8_t cbDice1;                             //骰子1点数（1-6）
+    uint8_t cbDice2;                             //骰子2点数（1-6）
     uint8_t cbBankerUser;                        //庄家用户
     uint8_t cbCurrentUser;                       //当前用户
     uint8_t cbCardData[MAX_COUNT * GAME_PLAYER]; //扑克列表
