@@ -151,6 +151,36 @@ uint8_t GameLogic::switchToCardIndex(uint8_t *cbCardData, uint8_t cbCardCount, u
     return cbCardCount;
 }
 
+/**
+ * 萧山麻将：手牌显示排序
+ * 白板是财神的替身。若本局财神不是白板，则在显示顺序上：
+ *  - 白板排在「它所代替的那张财神牌」的位置上；
+ *  - 真正的财神牌排在白板原本的位置（字牌区末尾）。
+ * 只调整显示牌面顺序，不改动逻辑层的牌索引。调用前 cbCardData 需清零。
+ * @param cbCardIndex 手牌索引
+ * @param cbCardData  输出：显示用的牌序列
+ * @param bMaxCount   数组容量
+ * @return 有效牌张数
+ */
+uint8_t GameLogic::switchToDisplayCardData(const uint8_t *cbCardIndex, uint8_t *cbCardData, uint8_t bMaxCount) {
+    uint8_t bPosition = 0;
+    for (uint8_t i = 0; i < MAX_INDEX; i++) {
+        uint8_t cbFace = switchToCardData(i);   //默认：位置 i 显示第 i 种牌
+        uint8_t cbCountIndex = i;
+        if (s_JokerCard != WHITE_CARD && i == s_JokerIndex) {
+            cbFace = WHITE_CARD;                //财神的位置改显示白板
+            cbCountIndex = WHITE_INDEX;
+        } else if (s_JokerCard != WHITE_CARD && i == WHITE_INDEX) {
+            cbFace = s_JokerCard;               //白板的位置改显示真财神
+            cbCountIndex = s_JokerIndex;
+        }
+        for (uint8_t j = 0; j < cbCardIndex[cbCountIndex] && bPosition < bMaxCount; j++) {
+            cbCardData[bPosition++] = cbFace;
+        }
+    }
+    return bPosition;
+}
+
 
 /**
  * 是否有效的牌
@@ -519,10 +549,10 @@ uint8_t GameLogic::analyseHuCard(const uint8_t *cbCardIndex, tagWeaveItem *Weave
  */
 uint8_t GameLogic::getHuFanShu(const uint64_t huRight, const uint8_t huKind, const uint8_t huSpecial) {
     //萧山麻将倍数表（可叠加，封顶 64 倍）：
-    //自摸×1(基础) | 碰碰胡×2 | 七对×4 | 豪华七对×8 | 清一色/清七对×8 | 字一色×16 | 天胡/地胡×16
+    //自摸×1(基础) | 大对子(碰碰胡)×4 | 七对×4 | 豪华七对×8 | 清七对×8 | 清一色×8 | 字一色×16 | 天胡/地胡×16
     //爆头(财神作将)×2 | 杠开×2
     uint8_t cbFan = 1;
-    if ((huRight & CHR_PPH) != 0) cbFan = 2;                        //碰碰胡
+    if ((huRight & CHR_PPH) != 0) cbFan = 4;                        //大对子（无顺子，四刻子+将）×4
     if ((huRight & CHR_QD) != 0) cbFan = 4;                         //七对
     if ((huRight & CHR_HQD) != 0) cbFan = 8;                        //豪华七对（七对中含四张相同）
     if ((huRight & CHR_QS) != 0) cbFan = 8;                         //清一色(清七对亦为8)

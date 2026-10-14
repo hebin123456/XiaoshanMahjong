@@ -312,10 +312,15 @@ bool GameLayer::onOutCardEvent(CMD_S_OutCard OutCard) {
         ui::ImageView *pHighlight = dynamic_cast<ui::ImageView *>(this->getChildByName( utility::toString("Image_Wheel_", j) ));
         pHighlight->setVisible(false);
     }
+    //萧山麻将：白板是财神的替身——本局财神不是白板时，打出白板按"它所代替的财神牌"报牌名
+    uint8_t cbSoundCard = OutCard.cbOutCardData;
+    if (cbSoundCard == WHITE_CARD && GameLogic::s_JokerCard != WHITE_CARD) {
+        cbSoundCard = GameLogic::s_JokerCard;
+    }
     UIHelper::playSound(utility::toString("raw/Mahjong/"
                                 , m_GameEngine->getPlayer(OutCard.cbOutCardUser)->getSexAsStr()
                                 , "/mjt"
-                                , utility::toString(((OutCard.cbOutCardData & MASK_COLOR) >> 4) + 1, "_", OutCard.cbOutCardData & MASK_VALUE)
+                                , utility::toString(((cbSoundCard & MASK_COLOR) >> 4) + 1, "_", cbSoundCard & MASK_VALUE)
                                 , ".mp3"));    //播放牌的声音
     return true;
 }
@@ -947,7 +952,8 @@ bool GameLayer::showAndUpdateHandCard() {
         uint8_t viewChairID = m_GameEngine->switchViewChairID(i, m_MeChairID);
         uint8_t bCardData[MAX_COUNT];  //手上的牌
         memset(bCardData, 0, sizeof(bCardData));
-        GameLogic::switchToCardData(m_cbCardIndex[i], bCardData, MAX_COUNT);
+        //萧山麻将：白板是财神的替身——显示时白板排在所代替的财神牌位置，真财神排到白板原位置
+        GameLogic::switchToDisplayCardData(m_cbCardIndex[i], bCardData, MAX_COUNT);
         uint8_t cbWeaveItemCount = m_cbWeaveItemCount[i]; //组合数量
         tagWeaveItem WeaveItemArray[MAX_WEAVE];         //组合
         memcpy(WeaveItemArray, m_WeaveItemArray[i], sizeof(WeaveItemArray));

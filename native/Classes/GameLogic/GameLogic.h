@@ -108,6 +108,8 @@ public:
     static uint8_t switchToCardIndex(uint8_t cbCardData);  //扑克转换
     static uint8_t switchToCardData(uint8_t cbCardIndex[MAX_INDEX], uint8_t cbCardData[MAX_COUNT], uint8_t bMaxCount); //扑克转换
     static uint8_t switchToCardIndex(uint8_t cbCardData[], uint8_t cbCardCount, uint8_t cbCardIndex[MAX_INDEX]); //扑克转换
+    //萧山麻将：手牌显示排序——白板与其替身的真财神在牌面上互换位置（仅影响显示顺序）
+    static uint8_t switchToDisplayCardData(const uint8_t cbCardIndex[MAX_INDEX], uint8_t cbCardData[MAX_COUNT], uint8_t bMaxCount);
     static uint8_t getCardCount(uint8_t cbCardIndex[MAX_INDEX]);  //扑克数目
     static uint8_t getWeaveCard(uint8_t cbWeaveKind, uint8_t cbCenterCard, uint8_t cbCardBuffer[]);//组合扑克
 public:
