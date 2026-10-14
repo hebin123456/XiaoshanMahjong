@@ -4,6 +4,9 @@
 
 #include "GameLogic.h"
 #include <random>
+#include <cstring>
+#include <functional>
+#include <vector>
 
 //麻将牌数据
 static const uint8_t s_MJCardDataArray[MAX_REPERTORY] = {
@@ -459,9 +462,160 @@ uint8_t GameLogic::analyseHuCardCount(const uint8_t *cbCardIndex, tagWeaveItem *
     return cbCount;
 }
 
+/**
+ * 含财神（白板万能）时的分析扑克
+ * 把白板从普通牌中抽出当作万能牌，枚举「将牌 + 若干面子」的所有拆分方式，
+ * 结果写入 AnalyseItemArray，供平胡/碰碰胡/清一色等番型函数复用。
+ * @param cbCardIndex
+ *  手上的牌（含财神）
+ * @param cbCardCount
+ *  牌数量（应为 3n+2）
+ * @param WeaveItem
+ *  已亮出的碰/杠/吃组合
+ * @param cbItemCount
+ *  组合数量
+ * @param AnalyseItemArray
+ *  分析结果
+ */
+void GameLogic::analyseCardJoker(const uint8_t *cbCardIndex, const uint8_t cbCardCount, tagWeaveItem *WeaveItem, uint8_t cbItemCount, CAnalyseItemArray &AnalyseItemArray) {
+    const size_t kMaxResult = 64;   //拆分方式上限，避免组合爆炸
+    uint8_t counts[MAX_INDEX];
+    memcpy(counts, cbCardIndex, sizeof(counts));
+    uint8_t jokers = counts[JOKER_INDEX];   //白板即万能财神
+    counts[JOKER_INDEX] = 0;
+    uint8_t sets = static_cast<uint8_t>((cbCardCount - 2) / 3);   //需要的面子数
+
+    struct MJMeld { uint8_t kind; uint8_t centerCard; };
+    std::vector<MJMeld> melds;
+    uint8_t eye = 0;
+
+    auto allZero = [&]() -> bool {
+        for (uint8_t k = 0; k < MAX_INDEX; k++) { if (counts[k] > 0) return false; }
+        return true;
+    };
+    auto firstNonZero = [&]() -> uint8_t {
+        for (uint8_t k = 0; k < MAX_INDEX; k++) { if (counts[k] > 0) return k; }
+        return 0xFF;
+    };
+    auto pushItem = [&]() {
+        if (AnalyseItemArray.size() >= kMaxResult) return;
+        tagAnalyseItem item;
+        memset(&item, 0, sizeof(item));
+        for (uint8_t i = 0; i < cbItemCount; i++) {
+            item.cbWeaveKind[i] = WeaveItem[i].cbWeaveKind;
+            item.cbCenterCard[i] = WeaveItem[i].cbCenterCard;
+        }
+        for (size_t i = 0; i < melds.size(); i++) {
+            item.cbWeaveKind[cbItemCount + i] = melds[i].kind;
+            item.cbCenterCard[cbItemCount + i] = melds[i].centerCard;
+        }
+        item.cbCardEye = eye;
+        AnalyseItemArray.push_back(item);
+    };
+
+    uint8_t curJokers = jokers;
+    uint8_t curSets = sets;
+    std::function<void(uint8_t, uint8_t)> enumSeqChoices;
+    std::function<void()> enumSetSol;
+
+    //在 [base, base+2] 三张牌上依次选择「用真实牌 / 用财神」，穷举该顺子的取法
+    enumSeqChoices = [&](uint8_t pos, uint8_t base) {
+        if (pos > static_cast<uint8_t>(base + 2)) {
+            melds.push_back({WIK_S, switchToCardData(static_cast<uint8_t>(base + 1))});
+            curSets--;
+            enumSetSol();
+            curSets++;
+            melds.pop_back();
+            return;
+        }
+        if (counts[pos] > 0) {          //用真实牌
+            counts[pos]--;
+            enumSeqChoices(static_cast<uint8_t>(pos + 1), base);
+            counts[pos]++;
+        }
+        if (curJokers > 0) {            //用财神顶替
+            curJokers--;
+            enumSeqChoices(static_cast<uint8_t>(pos + 1), base);
+            curJokers++;
+        }
+    };
+
+    //递归拆分剩余牌为 curSets 个面子
+    enumSetSol = [&]() {
+        if (curSets == 0) {
+            if (allZero() && curJokers == 0) pushItem();
+            return;
+        }
+        uint8_t i = firstNonZero();
+        if (i == 0xFF) {                //只剩财神：三张财神可作任意刻子
+            if (curJokers == 3u * curSets) {
+                for (uint8_t s = 0; s < curSets; s++) melds.push_back({WIK_P, JOKER_CARD});
+                uint8_t savedSets = curSets, savedJokers = curJokers;
+                curSets = 0; curJokers = 0;
+                if (allZero()) pushItem();
+                curSets = savedSets; curJokers = savedJokers;
+                for (uint8_t s = 0; s < savedSets; s++) melds.pop_back();
+            }
+            return;
+        }
+        //方案一：以 i 做刻子（用 k 张真实牌 + (3-k) 张财神）
+        uint8_t maxK = counts[i] > 3 ? 3 : counts[i];
+        for (uint8_t k = 1; k <= maxK; k++) {
+            uint8_t needJ = static_cast<uint8_t>(3 - k);
+            if (curJokers < needJ) continue;
+            counts[i] -= k; curJokers -= needJ; curSets--;
+            melds.push_back({WIK_P, switchToCardData(i)});
+            enumSetSol();
+            melds.pop_back(); curSets++; curJokers += needJ; counts[i] += k;
+        }
+        //方案二：以 i 参与顺子，顺子起点可能前移 0/1/2 位（前移位由财神顶替）
+        for (int off = 0; off <= 2; off++) {
+            int base = static_cast<int>(i) - off;
+            if (base < 0 || base >= 27) continue;                       //顺子仅限数牌
+            if ((base / 9) != (static_cast<int>(i) / 9)) continue;      //必须同花色
+            if ((base % 9) > 6) continue;                               //不能跨花色
+            enumSeqChoices(static_cast<uint8_t>(base), static_cast<uint8_t>(base));
+        }
+    };
+
+    auto tryPair = [&]() {
+        curSets = sets;
+        melds.clear();
+        enumSetSol();
+    };
+
+    //枚举将牌：真实对子 / 真实牌+财神 / 财神+财神
+    for (uint8_t i = 0; i < JOKER_INDEX; i++) {
+        if (counts[i] >= 2) {
+            counts[i] -= 2; eye = switchToCardData(i);
+            curJokers = jokers;
+            tryPair();
+            counts[i] += 2;
+        }
+    }
+    for (uint8_t i = 0; i < JOKER_INDEX; i++) {
+        if (counts[i] >= 1 && jokers >= 1) {
+            counts[i] -= 1; eye = switchToCardData(i);
+            curJokers = static_cast<uint8_t>(jokers - 1);
+            tryPair();
+            counts[i] += 1;
+        }
+    }
+    if (jokers >= 2) {
+        eye = JOKER_CARD;
+        curJokers = static_cast<uint8_t>(jokers - 2);
+        tryPair();
+    }
+}
+
 bool GameLogic::analyseCard(const uint8_t *cbCardIndex, const uint8_t cbCardCount, tagWeaveItem *WeaveItem, uint8_t cbItemCount, CAnalyseItemArray &AnalyseItemArray) {
     //效验数目
     if ((cbCardCount < 2) || (cbCardCount > MAX_COUNT) || ((cbCardCount - 2) % 3 != 0)) return false;
+    //萧山麻将：手中含财神（白板）时，走万能牌拆分逻辑
+    if (cbCardIndex[JOKER_INDEX] > 0) {
+        analyseCardJoker(cbCardIndex, cbCardCount, WeaveItem, cbItemCount, AnalyseItemArray);
+        return (AnalyseItemArray.size() > 0);
+    }
     //变量定义
     uint8_t cbKindItemCount = 0;
     tagKindItem KindItem[2 * MAX_INDEX];

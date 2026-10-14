@@ -11,6 +11,10 @@
 #define    MASK_COLOR                    0xF0                                //花色掩码
 #define    MASK_VALUE                    0x0F                                //数值掩码
 
+//萧山麻将：白板(z7 / 0x37)为万能财神
+#define JOKER_CARD                    0x37                                //财神牌（白板）
+#define JOKER_INDEX                   33                                  //财神在索引表中的位置 (3*9 + 7 - 1)
+
 #define FALSE        0
 #define TRUE         1
 
@@ -117,6 +121,7 @@ public:
     static uint8_t analyseHuCard(const uint8_t cbCardIndex[MAX_INDEX], tagWeaveItem WeaveItem[], uint8_t cbWeaveCount, uint8_t cbCurrentCard, uint8_t &huKind, uint64_t &huRight, uint8_t &huSpecial, const uint8_t cbSendCardCount, const uint8_t cbOutCardCount, const bool bGangStatus, const bool bZimo, const bool bQiangGangStatus, uint8_t &cbFanShu, const bool bCheck);    //胡牌分析，返回胡牌类型
     static uint8_t analyseHuCardCount(const uint8_t cbCardIndex[MAX_INDEX], tagWeaveItem WeaveItem[], uint8_t cbWeaveCount);    //获取胡牌的数量
     static bool analyseCard(const uint8_t cbCardIndex[MAX_INDEX], const uint8_t cbCardCount, tagWeaveItem WeaveItem[], uint8_t cbItemCount, CAnalyseItemArray &AnalyseItemArray); //分析扑克
+    static void analyseCardJoker(const uint8_t cbCardIndex[MAX_INDEX], const uint8_t cbCardCount, tagWeaveItem WeaveItem[], uint8_t cbItemCount, CAnalyseItemArray &AnalyseItemArray); //含财神（白板万能）时的分析扑克
     static bool analyseTingCard(const uint8_t cbCardIndex[MAX_INDEX], tagWeaveItem WeaveItem[], uint8_t cbWeaveCount);    //是否听牌
     static bool analyseCanHuCard(const uint8_t cbCardIndex[MAX_INDEX], tagWeaveItem WeaveItem[], uint8_t cbWeaveCount, uint8_t cbCurrentCard);   //分析是否可以胡牌
     static bool analyseTingCardResult(const uint8_t cbCardIndex[MAX_INDEX], tagWeaveItem WeaveItem[], uint8_t cbWeaveCount , tagTingResult& tingResult);
