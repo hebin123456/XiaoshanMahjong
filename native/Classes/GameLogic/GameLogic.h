@@ -7,6 +7,7 @@
 
 #include "GameCmd.h"
 #include <vector>
+#include <string>
 
 #define    MASK_COLOR                    0xF0                                //花色掩码
 #define    MASK_VALUE                    0x0F                                //数值掩码
@@ -120,6 +121,7 @@ public:
     //等级函数
     static uint8_t getUserActionRank(uint8_t wUserAction); //动作等级
     static uint8_t getHuFanShu(const uint64_t huRight, const uint8_t huKind, const uint8_t huSpecial); //胡牌分数
+    static std::string getHuTypeName(const uint64_t huRight, const uint8_t huKind, const uint8_t huSpecial); //胡牌牌型名称（一副牌可同时成立多种牌型时，取番数最大的那一种）
 public:
     //萧山麻将规则开关（由 GameConfig 注入，默认保持兼容行为）
     struct RuleFlags {

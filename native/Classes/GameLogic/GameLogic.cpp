@@ -566,6 +566,41 @@ uint8_t GameLogic::getHuFanShu(const uint64_t huRight, const uint8_t huKind, con
 }
 
 /**
+ * 获取胡牌牌型名称
+ * 一副牌可能同时成立多种牌型（例如既成顺子平胡又成刻子碰碰胡），
+ * 这里按与 getHuFanShu 相同的番数优先级，取番数最大的那一种作为牌型。
+ * @param huRight
+ * @param huKind
+ * @param huSpecial
+ * @return 牌型名称（含自摸/杠开等胡牌方式）
+ */
+std::string GameLogic::getHuTypeName(const uint64_t huRight, const uint8_t huKind, const uint8_t huSpecial) {
+    //基础牌型：按番数从低到高判断，后者覆盖前者，最终留下番数最高的一种
+    std::string strType;
+    if ((huRight & CHR_PH) != 0) strType = "平胡";
+    if ((huRight & CHR_PPH) != 0) strType = "碰碰胡";
+    if ((huRight & CHR_QD) != 0) strType = "七对";
+    if ((huRight & CHR_HQD) != 0) strType = "豪华七对";
+    if ((huRight & CHR_QS) != 0) strType = "清一色";
+    if ((huRight & CHR_ZY) != 0) strType = "字一色";
+    if ((huSpecial & CHS_TH) != 0) strType = "天胡";
+    else if ((huSpecial & CHS_DH) != 0) strType = "地胡";
+    if (strType.empty()) {
+        strType = ((huRight & CHR_BT) != 0) ? "爆头" : "胡";
+    }
+    //爆头作为附加番型（财神作将），未作为主牌型时一并展示
+    if ((huRight & CHR_BT) != 0 && strType != "爆头") {
+        strType += "·爆头";
+    }
+    //胡牌方式后缀
+    if ((huKind & CHK_GK) != 0) strType += "·杠上开花";
+    else if ((huKind & CHK_QG) != 0) strType += "·抢杠";
+    else if ((huKind & CHK_ZM) != 0) strType += "·自摸";
+    else if ((huKind & CHK_JP) != 0) strType += "·接炮";
+    return strType;
+}
+
+/**
  * 获取操作权重
  * @param wUserAction
  * @return

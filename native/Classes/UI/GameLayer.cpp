@@ -701,7 +701,8 @@ void GameLayer::showJokerCard(uint8_t cbCardData) {
     switch (iJokerSlot / 34) {  //向桌心偏移，摆在牌墙内侧
         case 0: pos += Vec2(0.0f, 44.0f); break;
         case 1: pos += Vec2(44.0f, 0.0f); break;
-        case 2: pos += Vec2(0.0f, -44.0f); break;
+        //北面：墙内侧紧挨着对家的出牌区，内移会挡住出牌位，改摆到桌面右上角避让
+        case 2: pos = Vec2(905.0f, 556.0f); break;
         case 3: default: pos += Vec2(-44.0f, 0.0f); break;
     }
     Node *pJoker = Node::create();
@@ -1706,8 +1707,9 @@ void GameLayer::onCardTouch(Ref *ref, ui::Widget::TouchEventType eventType) {
                     break;
                 }
                 case ui::Widget::TouchEventType::MOVED: {
-                    Vec2 a = pCard->getTouchBeganPosition();
-                    Vec2 b = pCard->getTouchMovePosition();
+                    //折叠屏/缩放适配：触摸点是世界坐标，需换算到桌面根节点(1280x720)坐标系，才能与本地坐标常量比较
+                    Vec2 a = m_rootNode->convertToNodeSpace(pCard->getTouchBeganPosition());
+                    Vec2 b = m_rootNode->convertToNodeSpace(pCard->getTouchMovePosition());
                     pCard->setPosition(m_startVec + (b - a));       //移动
                     if (b.y - a.y > 60 || abs(b.x - a.x) > 30) {    //移动判定
                         m_bMove = true;
@@ -1732,7 +1734,8 @@ void GameLayer::onCardTouch(Ref *ref, ui::Widget::TouchEventType eventType) {
                                 pCard->setPosition(m_startVec + Vec2(0, m_outY));       //移动
                             }
                         } else if (m_startVec.y == m_cardPosY + m_outY) {               //选牌状态
-                            Vec2 a = pCard->getTouchBeganPosition();                    //触摸上半部分，撤销出牌
+                            //折叠屏/缩放适配：换算到桌面根节点坐标系，避免缩放/居中后阈值判定错位
+                            Vec2 a = m_rootNode->convertToNodeSpace(pCard->getTouchBeganPosition());   //触摸上半部分，撤销出牌
                             if (a.y > 118) {
                                 pCard->setPosition(m_startVec - Vec2(0, m_outY));
                             } else {                                                   //触摸下半部分，出牌

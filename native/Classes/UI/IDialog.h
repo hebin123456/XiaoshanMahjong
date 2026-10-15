@@ -67,7 +67,7 @@ public:
     /**
      * 折叠屏/超宽屏适配：
      * 设计分辨率1280x720，实际窗口比例不定（折叠屏展开接近方形、超宽屏则更宽）。
-     * 根节点等比缩放（不拉伸不裁切）后居中；延展区用深绿桌面色铺满避免露底。
+     * 根节点等比缩放（不拉伸不裁切）后居中；两侧延展区用本层满幅背景图拉伸铺满，避免黑边。
      */
 	void fitRootNode() {
 		if (this->m_rootNode == nullptr) { return; }
@@ -81,12 +81,55 @@ public:
 		this->m_rootNode->setScale(this->m_fFitScale);
 		this->m_rootNode->setPosition(origin.x + (sz.width - cs.width * this->m_fFitScale) * 0.5f,
 		                              origin.y + (sz.height - cs.height * this->m_fFitScale) * 0.5f);
-		if (this->m_pBgColor == nullptr) {   //延展区底色（全屏铺满，位于内容之下）
-			this->m_pBgColor = LayerColor::create(Color4B(0x0E, 0x3D, 0x1F, 0xFF));
+		if (this->m_pBgColor == nullptr) {   //延展区底色：透明，避免出现黑边（露出本层背景图或下层场景）
+			this->m_pBgColor = LayerColor::create(Color4B(0, 0, 0, 0));
 			T::addChild(this->m_pBgColor, 0);
 		}
 		this->m_pBgColor->setContentSize(sz);
 		this->m_pBgColor->setPosition(origin);
+		this->fitBackground(sz);             //两侧延展区铺满可视区域
+	}
+
+	/**
+	 * 铺满可视区域：把根节点内“满幅”的背景图（尺寸≈根节点的图片节点）拉伸到整个可见区域。
+	 * 九宫格图片拉伸不变形；若没有满幅背景图（如居中的弹窗卡片），延展区保持透明并露出下层场景。
+	 * 子类可重写以指定自己的背景节点。
+	 */
+	virtual void fitBackground(const cocos2d::Size &sz) {
+		if (this->m_rootNode == nullptr) { return; }
+		Node *pBg = this->findFullBleedBackground(this->m_rootNode);
+		if (pBg == nullptr) { return; }
+		const float fScale = (this->m_fFitScale > 0.0f) ? this->m_fFitScale : 1.0f;
+		//保持背景图中心不变（与父节点坐标/锚点无关），再按可视区域拉伸
+		const Vec2 anchor = pBg->getAnchorPoint();
+		const cocos2d::Size oldSize = pBg->getContentSize();
+		const Vec2 center = Vec2(pBg->getPosition().x + (0.5f - anchor.x) * oldSize.width,
+		                         pBg->getPosition().y + (0.5f - anchor.y) * oldSize.height);
+		pBg->setAnchorPoint(Vec2(0.5f, 0.5f));
+		pBg->setPosition(center);
+		if (auto pWidget = dynamic_cast<ui::Widget*>(pBg)) {
+			pWidget->ignoreContentAdaptWithSize(false);   //按给定尺寸拉伸，而非按贴图原始尺寸自适应
+		}
+		pBg->setContentSize(cocos2d::Size(sz.width / fScale, sz.height / fScale));
+	}
+
+	//递归查找尺寸≈根节点内容尺寸的图片节点（满幅背景图）
+	Node* findFullBleedBackground(Node *pNode) {
+		if (pNode == nullptr) { return nullptr; }
+		const cocos2d::Size cs = this->m_rootNode->getContentSize();
+		Vector<Node*>& childs = pNode->getChildren();
+		for (Node *pChild : childs) {
+			if (pChild == this->m_pBgColor) { continue; }
+			if (dynamic_cast<ui::ImageView*>(pChild) != nullptr || dynamic_cast<Sprite*>(pChild) != nullptr) {
+				const cocos2d::Size s = pChild->getContentSize();
+				if (s.width >= cs.width * 0.99f && s.height >= cs.height * 0.99f) {
+					return pChild;
+				}
+			}
+			Node *pFound = this->findFullBleedBackground(pChild);
+			if (pFound != nullptr) { return pFound; }
+		}
+		return nullptr;
 	}
 
 	virtual void dispose() {
@@ -176,7 +219,7 @@ protected:
     ActionTimeline* m_rootAction;
 	float m_fFitScale = 1.0f;        //折叠屏/超宽屏适配缩放（弹窗弹出动画的终点比例应使用此值而非1.0）
 	cocos2d::Size m_lastFitSize;     //上次适配时的窗口尺寸（用于检测折叠/展开变化）
-	LayerColor* m_pBgColor = nullptr; //延展区底色（铺满全屏）
+	LayerColor* m_pBgColor = nullptr; //延展区透明底层（避免黑边，位于内容之下）
 
 private:
     std::map<std::string, Node*>  m_allCtrl;

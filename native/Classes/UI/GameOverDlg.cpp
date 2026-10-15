@@ -63,6 +63,11 @@ void GameOverDlg::showResult() {
         } else {
             pOverScoreText->setString(((GameEnd.lGameScore[i] >= 0) ? utility::toString("+", GameEnd.lGameScore[i]) : utility::toString(GameEnd.lGameScore[i])));
         }
+        //清掉上次可能残留的牌型文字，避免重复
+        ui::Text *pOldHuType = dynamic_cast<ui::Text *>(UIHelper::seekNodeByName(pPlayerViewNode, "Text_Hu_Type"));
+        if (pOldHuType) {
+            pOldHuType->removeFromParent();
+        }
         ui::Layout *pOverHandCard = dynamic_cast<ui::Layout *>(UIHelper::seekNodeByName(pPlayerViewNode, "Panel_Over_Hand_Card"));
         pOverHandCard->removeAllChildren();
         ui::ImageView *pOverHuCard = dynamic_cast<ui::ImageView *>(UIHelper::seekNodeByName(pPlayerViewNode, "ImageView_Over_Card"));  //胡的那张
@@ -85,6 +90,15 @@ void GameOverDlg::showResult() {
             pOverHuCard->loadTexture(UIHelper::getDiscardCardImagePath(0, GameEnd.cbHuCard));
             pOverHuCard->setVisible(true);
             pOverHuFlag->setVisible(true);
+            //醒目展示胡牌牌型（同一手牌可成立多种牌型时，取番数最大的那一种）
+            ui::Text *pHuTypeText = ui::Text::create(GameLogic::getHuTypeName(GameEnd.dwHuRight[i], GameEnd.cbHuKind[i], GameEnd.cbHuSpecial[i]), "res/DFYuanW7-GB2312.ttf", 32);
+            pHuTypeText->setName("Text_Hu_Type");
+            pHuTypeText->setTextColor(Color4B(255, 215, 0, 255));
+            pHuTypeText->enableOutline(Color4B(90, 50, 0, 255), 3);
+            pHuTypeText->setAnchorPoint(Vec2(0.0f, 0.5f));
+            pHuTypeText->setPosition(Vec2(285.0f, 94.0f));
+            pHuTypeText->setLocalZOrder(20);
+            pPlayerViewNode->addChild(pHuTypeText);
         }
         float x = 0;
         for (uint8_t j = 0; j < cbWeaveCount; j++) {   //组合数量
