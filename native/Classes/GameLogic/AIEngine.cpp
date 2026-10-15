@@ -71,7 +71,7 @@ bool AIEngine::onSendCardEvent(CMD_S_SendCard SendCard) {
         } else {
             //按 AI 强度选择出牌（默认打法为直接打出刚摸的牌）
             m_cbSendCardData = chooseDiscardCard();
-            DelayCall::add([this]() { sendCard(); }, time(NULL) % 2 + 0.8f);
+            DelayCall::add([this]() { sendCard(); }, time(NULL) % 2 + 1.3f);   //摸牌后出牌延时，放慢一点更自然
         }
     }
     return true;
@@ -142,7 +142,7 @@ bool AIEngine::onOperateResultEvent(CMD_S_OperateResult OperateResult) {
                 uint8_t cbReomveCard[] = {OperateResult.cbOperateCard, OperateResult.cbOperateCard};
                 GameLogic::removeCard(m_cbCardIndex[OperateResult.cbOperateUser], cbReomveCard, sizeof(cbReomveCard));
                 m_cbSendCardData = chooseDiscardCard();
-                DelayCall::add([this]() { sendCard(); }, time(NULL) % 2 + 0.5f);
+                DelayCall::add([this]() { sendCard(); }, time(NULL) % 2 + 0.9f);   //碰后出牌延时，放慢一点更自然
             }
             break;
         }

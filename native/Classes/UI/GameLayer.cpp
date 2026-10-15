@@ -62,6 +62,16 @@ void GameLayer::onUILoaded() {
         // 游戏设置按钮（局内模式：仅音量 + 「！本局信息」，不允许改规则）
         DialogManager::shared()->showDialog(SettingDlg::create(true));
     });
+    //牌墙/财神(z=5/6)绘制在 Panel_Game(z=0) 之上，会遮住碰杠等操作按钮，
+    //这里把游戏面板整体提到牌墙之上，保证按钮可见且可点击
+    Node *pPanelGame = m_rootNode->getChildByName("Panel_Game");
+    if (pPanelGame) {
+        pPanelGame->setLocalZOrder(10);
+    }
+    //操作按钮组再置于面板内最上层，避免被弃牌区、手牌等遮挡
+    if (m_pOperateNotifyGroup) {
+        m_pOperateNotifyGroup->setLocalZOrder(50);
+    }
     //弃牌区位置微调（为桌面四边牌墙让位）
     Node *pDiscardCard0 = this->getChildByName("DiscardCard_0");
     if (pDiscardCard0) {
@@ -701,8 +711,9 @@ void GameLayer::showJokerCard(uint8_t cbCardData) {
     switch (iJokerSlot / 34) {  //向桌心偏移，摆在牌墙内侧
         case 0: pos += Vec2(0.0f, 44.0f); break;
         case 1: pos += Vec2(44.0f, 0.0f); break;
-        //北面：墙内侧紧挨着对家的出牌区，内移会挡住出牌位，改摆到桌面右上角避让
-        case 2: pos = Vec2(905.0f, 556.0f); break;
+        //北面：墙内侧紧挨着对家的出牌区，内移会挡住出牌位；
+        //改摆到北墙右端与右墙顶端之间的角落空档，避开北家弃牌区(右边界约840)和右家弃牌区(左边界约909)
+        case 2: pos = Vec2(876.0f, 556.0f); break;
         case 3: default: pos += Vec2(-44.0f, 0.0f); break;
     }
     Node *pJoker = Node::create();
@@ -1538,7 +1549,7 @@ bool GameLayer::showAndPlayOperateEffect(uint8_t cbViewID, uint8_t cbOperateCode
         cocostudio::timeline::ActionTimeline *action = CSLoader::createTimeline(strEffect);
         action->gotoFrameAndPlay(0, false);
         pEffectNode->setName(strNodeName);
-        m_rootNode->addChild(pEffectNode);
+        m_rootNode->addChild(pEffectNode, 30);   //特效置于游戏面板(z=10)与骰子(z=20/21)之上
         if (cbOperateCode != WIK_H) {    //胡牌不自动删除动画
             action->setLastFrameCallFunc(CC_CALLBACK_0(GameLayer::removeEffectNode, this, strNodeName));
         }
