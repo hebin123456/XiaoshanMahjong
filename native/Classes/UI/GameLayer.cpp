@@ -59,8 +59,8 @@ void GameLayer::onUILoaded() {
         DialogManager::shared()->showDialog(alert);
     });
     m_btnSetting->addClickEventListener([this](Ref* sender) {
-        // 游戏设置按钮
-        DialogManager::shared()->showDialog(SettingDlg::create());
+        // 游戏设置按钮（局内模式：仅音量 + 「！本局信息」，不允许改规则）
+        DialogManager::shared()->showDialog(SettingDlg::create(true));
     });
     //弃牌区位置微调（为桌面四边牌墙让位）
     Node *pDiscardCard0 = this->getChildByName("DiscardCard_0");

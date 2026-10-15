@@ -5,10 +5,21 @@
 #include "SettingDlg.h"
 #include "GameConfig.h"
 #include "Utility.h"
+#include "GameEngine.h"
 
 using namespace std;
 
-SettingDlg::SettingDlg() : IDialog()
+SettingDlg *SettingDlg::create(bool bInGame) {
+    SettingDlg *pRet = new(std::nothrow) SettingDlg(bInGame);
+    if (pRet && pRet->init()) {
+        pRet->autorelease();
+        return pRet;
+    }
+    delete pRet;
+    return nullptr;
+}
+
+SettingDlg::SettingDlg(bool bInGame) : IDialog(), m_bInGame(bInGame)
 {
     RegDialogCtrl("Button_Close", m_btnClose);
     RegDialogCtrl("Slider_Volume", m_pSliderVolume);
@@ -17,6 +28,8 @@ SettingDlg::SettingDlg() : IDialog()
     m_startScoreLabel = nullptr;
     m_baseFanLabel = nullptr;
     m_fanCapLabel = nullptr;
+    m_pInfoEntryLabel = nullptr;
+    m_pInfoPanel = nullptr;
 }
 SettingDlg::~SettingDlg(){
 }
@@ -48,8 +61,105 @@ void SettingDlg::onUILoaded() {
                 break;
         }
     });
-    //萧山麻将规则开关
-    buildRuleSwitches();
+    //主页模式：完整规则设置；局内模式：仅「！本局信息」（局内不允许改规则）
+    if (m_bInGame) {
+        buildInGameInfo();
+    } else {
+        buildRuleSwitches();
+    }
+}
+
+/**
+ * 局内模式：音量滑块下方加「！本局信息」入口，点击弹出本局倍数/基本分等信息面板
+ */
+void SettingDlg::buildInGameInfo() {
+    //以音量滑块为锚点，入口排在滑块正下方
+    Vec2 anchor = m_rootNode->convertToNodeSpace(
+            m_pSliderVolume->getParent()->convertToWorldSpace(m_pSliderVolume->getPosition()));
+
+    GameConfig *cfg = GameConfig::getInstance();
+    GameEngine *pEngine = GameEngine::GetGameEngine();
+
+    //「！本局信息」入口（金色，点击展开/收起面板）
+    m_pInfoEntryLabel = Label::createWithTTF("！本局信息", "DFYuanW7-GB2312.ttf", 28);
+    m_pInfoEntryLabel->setAnchorPoint(Vec2(0.5f, 0.5f));
+    m_pInfoEntryLabel->setPosition(Vec2(anchor.x, anchor.y - 80.0f));
+    m_pInfoEntryLabel->setColor(Color3B(255, 235, 130));
+    m_rootNode->addChild(m_pInfoEntryLabel, 10);
+
+    //信息面板（默认隐藏，居中弹出于设置面板之上）
+    const Size cs = m_rootNode->getContentSize();
+    const Size panelSize(640.0f, 470.0f);
+    m_pInfoPanel = LayerColor::create(Color4B(15, 28, 22, 240), panelSize.width, panelSize.height);
+    m_pInfoPanel->setIgnoreAnchorPointForPosition(false);
+    m_pInfoPanel->setAnchorPoint(Vec2(0.5f, 0.5f));
+    m_pInfoPanel->setPosition(Vec2(cs.width * 0.5f, cs.height * 0.5f));
+    m_pInfoPanel->setVisible(false);
+    m_rootNode->addChild(m_pInfoPanel, 30);
+
+    //面板内容
+    auto addLine = [this](const std::string &text, float y, const Color3B &color, float fontSize = 26) {
+        Label *label = Label::createWithTTF(text, "DFYuanW7-GB2312.ttf", fontSize);
+        label->setAnchorPoint(Vec2(0.5f, 0.5f));
+        label->setPosition(Vec2(m_pInfoPanel->getContentSize().width * 0.5f, y));
+        label->setColor(color);
+        m_pInfoPanel->addChild(label);
+        return label;
+    };
+    addLine("—— 本局信息 ——", panelSize.height - 40.0f, Color3B(255, 235, 130), 30);
+
+    uint8_t cbStreak = pEngine->getBankerStreak();
+    if (cbStreak < 1) { cbStreak = 1; }   //开局掷骰前连庄数可能还是0，按首庄展示
+    uint8_t cbMult = pEngine->getBankerStreakMult();
+    std::string strStreak = (cbStreak <= 1) ? std::string("首庄")
+            : (utility::toString((int) cbStreak) + " 连庄");
+    addLine("本局倍数：×" + utility::toString((int) cbMult) + "（庄家 " + strStreak + "）",
+            panelSize.height - 100.0f, Color3B(255, 210, 90));
+    addLine("基本分（底分）：" + utility::toString(cfg->m_iBaseFan) + " 分",
+            panelSize.height - 145.0f, Color3B(255, 255, 255));
+    addLine("番数封顶：" + utility::toString(cfg->m_iFanCap) + " 番",
+            panelSize.height - 190.0f, Color3B(255, 255, 255));
+    static const char *kRuleTitles[RULE_COUNT] = {
+            "允许捉冲(点炮胡)",
+            "有财神必须爆头",
+            "允许吃三摊(承包)",
+    };
+    const bool rulesOn[RULE_COUNT] = { cfg->m_bAllowChiHu, cfg->m_bJokerBaoTou, cfg->m_bAllowChiSanTan };
+    for (int i = 0; i < RULE_COUNT; i++) {
+        addLine(std::string(kRuleTitles[i]) + "：" + (rulesOn[i] ? "开" : "关"),
+                panelSize.height - 235.0f - i * 45.0f,
+                rulesOn[i] ? Color3B(120, 255, 120) : Color3B(190, 190, 190));
+    }
+    static const char *kLevels[3] = {"入门", "普通", "高手"};
+    int iAiLevel = cfg->m_iAiLevel;
+    if (iAiLevel < 0 || iAiLevel > 2) { iAiLevel = 1; }
+    addLine(std::string("AI 强度：") + kLevels[iAiLevel],
+            panelSize.height - 235.0f - RULE_COUNT * 45.0f, Color3B(255, 255, 255));
+
+    //点击入口：展开/收起面板
+    auto entryListener = EventListenerTouchOneByOne::create();
+    entryListener->setSwallowTouches(true);
+    entryListener->onTouchBegan = [this](Touch *touch, Event *) -> bool {
+        Vec2 p = m_pInfoEntryLabel->getParent()->convertToNodeSpace(touch->getLocation());
+        return m_pInfoEntryLabel->getBoundingBox().containsPoint(p);
+    };
+    entryListener->onTouchEnded = [this](Touch *touch, Event *) {
+        Vec2 p = m_pInfoEntryLabel->getParent()->convertToNodeSpace(touch->getLocation());
+        if (m_pInfoEntryLabel->getBoundingBox().containsPoint(p)) {
+            bool bVisible = !m_pInfoPanel->isVisible();
+            m_pInfoPanel->setVisible(bVisible);
+        }
+    };
+    _eventDispatcher->addEventListenerWithSceneGraphPriority(entryListener, m_pInfoEntryLabel);
+
+    //点击面板任意处收起
+    auto panelListener = EventListenerTouchOneByOne::create();
+    panelListener->setSwallowTouches(true);
+    panelListener->onTouchBegan = [](Touch *, Event *) -> bool { return true; };
+    panelListener->onTouchEnded = [this](Touch *, Event *) {
+        m_pInfoPanel->setVisible(false);
+    };
+    _eventDispatcher->addEventListenerWithSceneGraphPriority(panelListener, m_pInfoPanel);
 }
 
 /**
