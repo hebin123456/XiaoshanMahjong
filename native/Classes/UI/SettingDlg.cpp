@@ -152,12 +152,20 @@ void SettingDlg::buildInGameInfo() {
     };
     _eventDispatcher->addEventListenerWithSceneGraphPriority(entryListener, m_pInfoEntryLabel);
 
-    //点击面板任意处收起
+    //点击面板任意处收起（仅在面板可见且点击落在面板内时才拦截，避免隐藏时吞掉全屏触摸导致设置界面点不动）
     auto panelListener = EventListenerTouchOneByOne::create();
     panelListener->setSwallowTouches(true);
-    panelListener->onTouchBegan = [](Touch *, Event *) -> bool { return true; };
-    panelListener->onTouchEnded = [this](Touch *, Event *) {
-        m_pInfoPanel->setVisible(false);
+    panelListener->onTouchBegan = [this](Touch *touch, Event *) -> bool {
+        if (m_pInfoPanel == nullptr || !m_pInfoPanel->isVisible()) { return false; }
+        Vec2 p = m_pInfoPanel->getParent()->convertToNodeSpace(touch->getLocation());
+        return m_pInfoPanel->getBoundingBox().containsPoint(p);
+    };
+    panelListener->onTouchEnded = [this](Touch *touch, Event *) {
+        if (m_pInfoPanel == nullptr || !m_pInfoPanel->isVisible()) { return; }
+        Vec2 p = m_pInfoPanel->getParent()->convertToNodeSpace(touch->getLocation());
+        if (m_pInfoPanel->getBoundingBox().containsPoint(p)) {
+            m_pInfoPanel->setVisible(false);
+        }
     };
     _eventDispatcher->addEventListenerWithSceneGraphPriority(panelListener, m_pInfoPanel);
 }
