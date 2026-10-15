@@ -13,9 +13,13 @@ public:
 protected:
     virtual const char* csbName() const {return "res/HelloLayer.csb";}
 	virtual void onUILoaded();
-	
+
+private:
+    void showSexChoice();      //开局前选择打牌语音性别（男声/女声）
+
 private:
     Button* m_btnLogon;
+    Node* m_pSexChoiceLayer;   //语音性别选择浮层（null=未弹出）
 };
 
 

@@ -71,8 +71,9 @@ void GameLayer::onUILoaded() {
     if (pDiscardCard2) {
         pDiscardCard2->setPosition(Vec2(430.0f, 448.0f));
     }
-    // 玩家加入游戏
-    RealPlayer *pIPlayer = new RealPlayer(IPlayer::MALE, this);
+    // 玩家加入游戏（语音性别取开局时的选择：0女声 1男声）
+    RealPlayer *pIPlayer = new RealPlayer(
+            GameConfig::getInstance()->m_iVoiceSex == 0 ? IPlayer::FEMALE : IPlayer::MALE, this);
     m_GameEngine->onUserEnter(pIPlayer);
     m_MeChairID = pIPlayer->getChairID();
     // 创建个定时任务，用来添加机器人

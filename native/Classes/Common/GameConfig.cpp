@@ -40,6 +40,8 @@ void GameConfig::loadConfig() {
     //番数封顶（默认32）
     int iFanCap = UserDefault::getInstance()->getIntegerForKey("Rule_FanCap", 32);
     m_iFanCap = (iFanCap == 16 || iFanCap == 64) ? iFanCap : 32;
+    //打牌语音性别（默认1男声；0女声）
+    m_iVoiceSex = UserDefault::getInstance()->getIntegerForKey("Voice_Sex", 1);
 }
 
 /**
@@ -54,5 +56,6 @@ void GameConfig::saveConfig() {
     UserDefault::getInstance()->setIntegerForKey("Rule_StartScore", m_iStartScore);
     UserDefault::getInstance()->setIntegerForKey("Rule_BaseFan", m_iBaseFan);
     UserDefault::getInstance()->setIntegerForKey("Rule_FanCap", m_iFanCap);
+    UserDefault::getInstance()->setIntegerForKey("Voice_Sex", m_iVoiceSex);
 }
 
